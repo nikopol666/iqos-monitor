@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ChevronDown, ChevronUp, SlidersHorizontal } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import type { StatsResult, GroupBy, Bucket } from "@/lib/stats";
@@ -29,6 +29,21 @@ interface View {
   group: GroupBy;
 }
 
+/** Current width of an element, kept up to date with ResizeObserver. */
+function useElementWidth(ref: React.RefObject<HTMLDivElement | null>): number {
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return width;
+}
+
 function shiftDays(key: string, n: number): string {
   const [y, m, d] = key.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
@@ -37,7 +52,8 @@ function shiftDays(key: string, n: number): string {
 export function StatsClient({ devices, users, defaultFrom, defaultTo }: { devices: DeviceOpt[]; users: UserOpt[]; defaultFrom: string; defaultTo: string }) {
   const { t, f } = useI18n();
   const fmt = useFormat();
-  const [view, setView] = useState<View>({ from: defaultFrom, to: defaultTo, group: "day" });
+  // Default 90-day range reads better by week; day grouping stays one click away.
+  const [view, setView] = useState<View>({ from: defaultFrom, to: defaultTo, group: "week" });
   const [history, setHistory] = useState<View[]>([]);
   const [userId, setUserId] = useState<string>("");
   const [serial, setSerial] = useState<string>("");
@@ -47,6 +63,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [drill, setDrill] = useState<{ bucket: Bucket; items: DayRecord[] | null } | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const { from, to, group } = view;
 
@@ -169,12 +186,22 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
   }
 
   const deviceBySerial = useMemo(() => new Map(devices.map((d) => [d.serial, d])), [devices]);
+  const chartRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{t.stats.title}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">{t.stats.title}</h1>
+        <button type="button" className="ui-btn h-8 max-w-[70%] text-xs sm:hidden" onClick={() => setFiltersOpen((o) => !o)} aria-expanded={filtersOpen}>
+          <SlidersHorizontal size={14} aria-hidden />
+          <span className="truncate">
+            {filtersOpen ? t.stats.hideFilters : `${bucketLabel(from, "day", true)} – ${bucketLabel(to, "day", true)} · ${unitLabel}`}
+          </span>
+          {filtersOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+        </button>
+      </div>
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className={`${filtersOpen ? "flex" : "hidden"} flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-3 sm:flex sm:border-0 sm:bg-transparent sm:p-0`}>
         <div className="flex gap-1">
           {presets.map((p) => (
             <button key={p.key} type="button" className="ui-btn h-8 px-2.5 text-xs" onClick={() => applyPreset(p.days)}>
@@ -390,9 +417,11 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
 
   function Chart({ rows, metric }: { rows: Record<string, number | string>[]; metric: "sessions" | "puffs" }) {
     const bars = series.length ? series.map((d) => ({ key: `${metric}:${d.serial}`, name: d.name, color: colorCss(d.color) })) : [];
-    const interval = rows.length > 12 ? Math.ceil(rows.length / 12) - 1 : 0;
+    const width = useElementWidth(chartRef);
+    const maxTicks = Math.max(3, Math.floor((width || 600) / 72));
+    const interval = rows.length > maxTicks ? Math.ceil(rows.length / maxTicks) - 1 : 0;
     return (
-      <div className="h-64 w-full">
+      <div ref={chartRef} className="h-52 w-full sm:h-64">
         <ResponsiveContainer>
           <BarChart
             data={rows}
@@ -405,8 +434,8 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
             style={{ cursor: "pointer" }}
           >
             <CartesianGrid vertical={false} stroke="var(--grid)" />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--text-2)" }} tickLine={false} axisLine={{ stroke: "var(--border)" }} interval={interval} minTickGap={12} />
-            <YAxis tick={{ fontSize: 11, fill: "var(--text-2)" }} tickLine={false} axisLine={false} width={36} allowDecimals={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--text-2)" }} tickLine={false} axisLine={{ stroke: "var(--border)" }} interval={interval} minTickGap={16} />
+            <YAxis tick={{ fontSize: 11, fill: "var(--text-2)" }} tickLine={false} axisLine={false} width={32} allowDecimals={false} />
             <Tooltip
               cursor={{ fill: "var(--surface-2)" }}
               contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--text)" }}

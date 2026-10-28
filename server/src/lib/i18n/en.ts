@@ -84,6 +84,8 @@ export const en = {
     drillEmpty: "No records in this period.",
     back: "Back",
     perDevice: "By device",
+    filters: "Filters",
+    hideFilters: "Hide filters",
   },
   device: {
     title: "Device",

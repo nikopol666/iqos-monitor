@@ -86,6 +86,8 @@ export const cs: Dictionary = {
     drillEmpty: "V tomto období nejsou žádné záznamy.",
     back: "Zpět",
     perDevice: "Podle zařízení",
+    filters: "Filtry",
+    hideFilters: "Skrýt filtry",
   },
   device: {
     title: "Zařízení",
