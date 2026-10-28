@@ -1,0 +1,7 @@
+# Override: build the image on the Docker host from this checkout.
+services:
+  iqos-monitor:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: iqos-monitor:local

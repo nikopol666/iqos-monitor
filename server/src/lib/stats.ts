@@ -1,0 +1,129 @@
+import { addDays, daysBetweenInclusive, isoWeekKey, isoWeekStart, localDateKey, monthKey, DISPLAY_TZ } from "./time";
+
+export type GroupBy = "day" | "week" | "month";
+
+export interface StatRow {
+  serial: string;
+  timestampUtc: string;
+  puffCount: number | null;
+  clockSuspect: number;
+}
+
+export interface Bucket {
+  key: string;
+  /** First calendar day of the bucket (YYYY-MM-DD). */
+  start: string;
+  /** Last calendar day of the bucket inside the range. */
+  end: string;
+  days: number;
+  records: number;
+  sessions: number;
+  puffs: number;
+  suspect: number;
+  perSerial: Record<string, { records: number; sessions: number; puffs: number }>;
+}
+
+export interface StatTotals {
+  records: number;
+  sessions: number;
+  puffs: number;
+  suspect: number;
+  daysInRange: number;
+  daysWithData: number;
+  avgRecordsPerDay: number;
+  avgSessionsPerDay: number;
+  avgPuffsPerDay: number;
+  avgRecordsPerActiveDay: number;
+  avgSessionsPerActiveDay: number;
+  avgPuffsPerActiveDay: number;
+  avgPuffsPerSession: number | null;
+}
+
+export interface StatsResult {
+  groupBy: GroupBy;
+  from: string;
+  to: string;
+  tz: string;
+  buckets: Bucket[];
+  totals: StatTotals;
+}
+
+function bucketKeyFor(dateKey: string, groupBy: GroupBy): string {
+  if (groupBy === "day") return dateKey;
+  if (groupBy === "week") return isoWeekKey(dateKey);
+  return monthKey(dateKey);
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Aggregates archive records into calendar buckets of the display zone.
+ * Every bucket in [from, to] is present even when empty, so charts stay
+ * continuous. "records" = timestamped archive entries, "sessions" = records
+ * with at least one decoded puff event, "puffs" = sum of decoded puff counts.
+ */
+export function computeStats(rows: StatRow[], from: string, to: string, groupBy: GroupBy, tz: string = DISPLAY_TZ): StatsResult {
+  const buckets = new Map<string, Bucket>();
+  // Pre-create buckets for the whole range.
+  for (let day = from; day <= to; day = addDays(day, 1)) {
+    const key = bucketKeyFor(day, groupBy);
+    let b = buckets.get(key);
+    if (!b) {
+      const start = groupBy === "week" ? isoWeekStart(day) : groupBy === "month" ? day.slice(0, 7) + "-01" : day;
+      b = { key, start: start < from ? from : start, end: day, days: 0, records: 0, sessions: 0, puffs: 0, suspect: 0, perSerial: {} };
+      buckets.set(key, b);
+    }
+    b.end = day;
+    b.days++;
+  }
+  const activeDays = new Set<string>();
+  let records = 0;
+  let sessions = 0;
+  let puffs = 0;
+  let suspect = 0;
+  for (const row of rows) {
+    const day = localDateKey(new Date(row.timestampUtc), tz);
+    if (day < from || day > to) continue;
+    const b = buckets.get(bucketKeyFor(day, groupBy));
+    if (!b) continue;
+    activeDays.add(day);
+    const isSession = (row.puffCount ?? 0) > 0;
+    const p = row.puffCount ?? 0;
+    b.records++;
+    records++;
+    if (isSession) {
+      b.sessions++;
+      sessions++;
+    }
+    b.puffs += p;
+    puffs += p;
+    if (row.clockSuspect) {
+      b.suspect++;
+      suspect++;
+    }
+    const ps = (b.perSerial[row.serial] ??= { records: 0, sessions: 0, puffs: 0 });
+    ps.records++;
+    if (isSession) ps.sessions++;
+    ps.puffs += p;
+  }
+  const daysInRange = daysBetweenInclusive(from, to);
+  const daysWithData = activeDays.size;
+  const totals: StatTotals = {
+    records,
+    sessions,
+    puffs,
+    suspect,
+    daysInRange,
+    daysWithData,
+    avgRecordsPerDay: round2(records / daysInRange),
+    avgSessionsPerDay: round2(sessions / daysInRange),
+    avgPuffsPerDay: round2(puffs / daysInRange),
+    avgRecordsPerActiveDay: daysWithData ? round2(records / daysWithData) : 0,
+    avgSessionsPerActiveDay: daysWithData ? round2(sessions / daysWithData) : 0,
+    avgPuffsPerActiveDay: daysWithData ? round2(puffs / daysWithData) : 0,
+    avgPuffsPerSession: sessions ? round2(puffs / sessions) : null,
+  };
+  return { groupBy, from, to, tz, buckets: [...buckets.values()], totals };
+}

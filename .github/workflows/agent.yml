@@ -1,0 +1,38 @@
+name: agent
+
+on:
+  push:
+    branches: [main]
+    paths: ["agent/**", "test-vectors/**", ".github/workflows/agent.yml"]
+    tags: ["v*"]
+  pull_request:
+    paths: ["agent/**", "test-vectors/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements-dev.txt
+      - run: python run_tests.py
+      - name: Build IQOS-Agent.exe
+        run: pyinstaller --noconfirm iqos_agent.spec
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IQOS-Agent-windows
+          path: agent/dist/IQOS-Agent.exe
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: agent/dist/IQOS-Agent.exe

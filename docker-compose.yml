@@ -1,0 +1,26 @@
+# IQOS Monitor – single container: web UI + API + SQLite on a named volume.
+#
+#   docker login ghcr.io            # PAT with read:packages (private image)
+#   docker compose pull && docker compose up -d
+#
+# Local build instead of the registry image:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+
+services:
+  iqos-monitor:
+    image: ghcr.io/${GHCR_OWNER:-OWNER}/iqos-monitor:${IQOS_TAG:-latest}
+    container_name: iqos-monitor
+    restart: unless-stopped
+    ports:
+      - "${IQOS_PORT:-3000}:3000"
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      DISPLAY_TZ: ${DISPLAY_TZ:-Europe/Prague}
+      DATABASE_PATH: /data/iqos.sqlite3
+      # Optional fixed key accepted from every agent (otherwise create keys in Settings → Agents).
+      AGENT_API_KEY: ${AGENT_API_KEY:-}
+    volumes:
+      - iqos-data:/data
+
+volumes:
+  iqos-data:

@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+data
+*.sqlite3*
+.env*
+npm-debug.log
+README.md
+AGENTS.md
