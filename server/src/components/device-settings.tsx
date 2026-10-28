@@ -6,7 +6,7 @@ import { useFormat, useI18n } from "@/lib/i18n/client";
 import type { SettingsView } from "@/app/api/devices/[serial]/settings/route";
 import { Card, CardTitle, Notice } from "@/components/ui";
 
-type SettingKey = "flexpuff" | "brightness" | "autostart";
+type SettingKey = "flexpuff" | "brightness" | "autostart" | "smart_gesture" | "lock" | "find" | "vib_heat" | "vib_ready" | "vib_almost" | "vib_end";
 
 /** Toggle controls for the settings the agent can write; polls while a change is pending. */
 export function DeviceSettings({ serial, connected, initial }: { serial: string; connected: boolean; initial: SettingsView }) {
@@ -56,7 +56,7 @@ export function DeviceSettings({ serial, connected, initial }: { serial: string;
       <div key={setting} className="flex flex-wrap items-center justify-between gap-2 border-b border-border py-2 last:border-0">
         <div className="text-sm">
           {label}
-          {view.statuses[setting === "brightness" ? "battery" : setting] === "unsupported" ? <span className="ml-2 text-xs text-muted">{t.device.unsupportedUsb}</span> : null}
+          {setting !== "find" && view.statuses[setting === "brightness" ? "battery" : setting] === "unsupported" ? <span className="ml-2 text-xs text-muted">{t.device.unsupportedUsb}</span> : null}
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-surface-2 p-0.5">
           {options.map((o) => {
@@ -88,10 +88,14 @@ export function DeviceSettings({ serial, connected, initial }: { serial: string;
         {renderRow({ label: t.device.flexpuff, setting: "flexpuff", current: view.values.flexpuff, options: [{ value: "off", label: t.device.off }, { value: "on", label: t.device.on }] })}
         {renderRow({ label: t.device.brightness, setting: "brightness", current: view.values.brightness, options: [{ value: "low", label: t.device.low }, { value: "high", label: t.device.high }] })}
         {renderRow({ label: t.device.autostart, setting: "autostart", current: view.values.autostart, options: [{ value: "off", label: t.device.off }, { value: "on", label: t.device.on }] })}
-        <div className="flex items-center justify-between py-2 text-sm">
-          <span>{t.device.smartGesture}</span>
-          <span className="text-text-2">{view.values.smart_gesture === "on" ? t.device.on : view.values.smart_gesture === "off" ? t.device.off : "—"}</span>
-        </div>
+        {renderRow({ label: t.device.smartGesture, setting: "smart_gesture", current: view.values.smart_gesture, options: [{ value: "off", label: t.device.off }, { value: "on", label: t.device.on }] })}
+        {renderRow({ label: t.device.lock, setting: "lock", current: view.values.lock, options: [{ value: "off", label: t.device.unlocked }, { value: "on", label: t.device.locked }] })}
+        {renderRow({ label: t.device.find, setting: "find", current: null, options: [{ value: "on", label: t.device.findStart }, { value: "off", label: t.device.findStop }] })}
+        <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-text-2">{t.device.vibrations}</div>
+        {renderRow({ label: t.device.vibHeat, setting: "vib_heat", current: view.values.vib_heat, options: [{ value: "off", label: t.device.off }, { value: "on", label: t.device.on }] })}
+        {renderRow({ label: t.device.vibReady, setting: "vib_ready", current: view.values.vib_ready, options: [{ value: "off", label: t.device.off }, { value: "on", label: t.device.on }] })}
+        {renderRow({ label: t.device.vibAlmost, setting: "vib_almost", current: view.values.vib_almost, options: [{ value: "off", label: t.device.off }, { value: "on", label: t.device.on }] })}
+        {renderRow({ label: t.device.vibEnd, setting: "vib_end", current: view.values.vib_end, options: [{ value: "off", label: t.device.off }, { value: "on", label: t.device.on }] })}
       </div>
       {pending.length ? (
         <p className="mt-2 text-xs text-accent">{t.device.applying}</p>

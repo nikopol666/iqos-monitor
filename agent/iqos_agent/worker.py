@@ -256,7 +256,7 @@ class DeviceWorker(threading.Thread):
             return
         try:
             result = apply_setting(dev, self._model, setting, value)
-            final, message = "done", json.dumps({"setting": setting, "value": result})
+            final, message = "done", json.dumps({"setting": setting, "value": result if result is not None else value})
             log.info("%s %s now %s", self.serial, setting, result)
         except SettingError as exc:
             final, message = "failed", str(exc)

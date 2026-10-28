@@ -22,9 +22,15 @@ export const READ_COMMANDS = {
   vibration: "c90023e9",
   flexbattery: "c90025fb",
   // Read-only probes from hauntedfail/iqos; same SCP frames over USB.
-  flexpuff: "d205220300000017",
-  autostart: "c907240100000022",
-  pause_mode: "c907240200000018",
+  flexpuff: "c905220300000017",
+  autostart: "c007240100000022",
+  pause_mode: "c007240200000018",
+  smart_gesture: "c00405050100006c",
+  lock: "c000041c",
+  vib_heat: "c007040c000000b8",
+  vib_almost: "c007040e00000094",
+  vib_ready: "c007040d000000ae",
+  vib_end: "c007040f00000082",
   holder_firmware: "c9000000",
   epoch: "c003003f",
   conversion: "c00020e0",
@@ -69,6 +75,12 @@ export interface SnapshotValues {
   flexpuff_enabled: boolean | null;
   autostart_enabled: boolean | null;
   pause_mode_enabled: boolean | null;
+  smart_gesture_enabled: boolean | null;
+  locked: boolean | null;
+  vib_heat_enabled: boolean | null;
+  vib_almost_enabled: boolean | null;
+  vib_ready_enabled: boolean | null;
+  vib_end_enabled: boolean | null;
   holder_firmware_raw: string | null;
   epoch_raw: string | null;
   conversion_raw: string | null;
@@ -78,6 +90,12 @@ export interface SnapshotValues {
 function flag(payload: Uint8Array | undefined, settingId: number): boolean | null {
   if (!payload || payload.length < 2 || payload[0] !== settingId) return null;
   return payload[1] === 1;
+}
+
+/** Vibration row of register 0x04: byte 11 is 0x1D (on) or 0x01 (off). */
+function vibRow(payload: Uint8Array | undefined): boolean | null {
+  if (!payload || payload.length < 12) return null;
+  return payload[11] === 0x1d ? true : payload[11] === 0x01 ? false : null;
 }
 
 /** Re-derive snapshot values from stored raw frames (hex per command key). */
@@ -126,6 +144,12 @@ export function parseSnapshotFrames(frames: Partial<Record<ClassicKey, string>>)
     flexpuff_enabled: flag(payloads.flexpuff, 0x03),
     autostart_enabled: flag(payloads.autostart, 0x01),
     pause_mode_enabled: flag(payloads.pause_mode, 0x02),
+    smart_gesture_enabled: payloads.smart_gesture && payloads.smart_gesture.length >= 5 && payloads.smart_gesture[0] === 0x05 ? payloads.smart_gesture[4] === 1 : null,
+    locked: payloads.lock && payloads.lock.length ? payloads.lock[0] === 0x02 : null,
+    vib_heat_enabled: vibRow(payloads.vib_heat),
+    vib_almost_enabled: vibRow(payloads.vib_almost),
+    vib_ready_enabled: vibRow(payloads.vib_ready),
+    vib_end_enabled: vibRow(payloads.vib_end),
     holder_firmware_raw: hexOrNull("holder_firmware"),
     epoch_raw: hexOrNull("epoch"),
     conversion_raw: hexOrNull("conversion"),

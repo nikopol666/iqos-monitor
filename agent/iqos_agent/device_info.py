@@ -29,7 +29,12 @@ READ_COMMANDS = {
     'flexpuff': 'c905220300000017',   # as the official app reads it (D2 05 22 03 works too)
     'autostart': 'c007240100000022',  # ILUMA i ONE answers on C0, not C9
     'pause_mode': 'c007240200000018',
-    'smart_gesture': 'c905220400000075',
+    'smart_gesture': 'c00405050100006c',   # as the official app reads it (byte 4 = state)
+    'lock': 'c000041c',
+    'vib_heat': 'c007040c000000b8',
+    'vib_almost': 'c007040e00000094',
+    'vib_ready': 'c007040d000000ae',
+    'vib_end': 'c007040f00000082',
     'holder_firmware': 'c9000000',
     'epoch': 'c003003f',
     'conversion': 'c00020e0',
@@ -146,7 +151,12 @@ def read_snapshot(dev):
     pm=payloads.get('pause_mode',b'')
     values['pause_mode_enabled']=(pm[1]==1) if len(pm)>=2 and pm[0]==0x02 else None
     sg=payloads.get('smart_gesture',b'')
-    values['smart_gesture_enabled']=(sg[1]==1) if len(sg)>=2 and sg[0]==0x04 else None
+    values['smart_gesture_enabled']=(sg[4]==1) if len(sg)>=5 and sg[0]==0x05 else None
+    lk=payloads.get('lock',b'')
+    values['locked']=(lk[0]==0x02) if len(lk)>=1 else None
+    for vib_key in ('vib_heat','vib_almost','vib_ready','vib_end'):
+        row=payloads.get(vib_key,b'')
+        values[vib_key+'_enabled']=({0x1D:True,0x01:False}.get(row[11]) if len(row)>=12 else None)
     values['holder_firmware_raw']=payloads.get('holder_firmware',b'').hex() or None
     values['epoch_raw']=payloads.get('epoch',b'').hex() or None
     values['conversion_raw']=payloads.get('conversion',b'').hex() or None

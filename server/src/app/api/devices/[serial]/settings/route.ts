@@ -11,12 +11,19 @@ const WRITABLE: Record<string, string[]> = {
   flexpuff: ["on", "off"],
   brightness: ["low", "high"],
   autostart: ["on", "off"],
+  smart_gesture: ["on", "off"],
+  lock: ["on", "off"],
+  find: ["on", "off"],
+  vib_heat: ["on", "off"],
+  vib_ready: ["on", "off"],
+  vib_almost: ["on", "off"],
+  vib_end: ["on", "off"],
 };
 
 export interface SettingsView {
   model: string | null;
   readAtUtc: string | null;
-  values: { flexpuff: string | null; brightness: string | null; autostart: string | null; smart_gesture: string | null; pause_mode: string | null };
+  values: Record<"flexpuff" | "brightness" | "autostart" | "smart_gesture" | "pause_mode" | "lock" | "vib_heat" | "vib_ready" | "vib_almost" | "vib_end", string | null>;
   statuses: Record<string, string>;
   jobs: { id: number; setting: string; value: string; status: string; message: string | null; updatedUtc: string }[];
 }
@@ -50,6 +57,11 @@ export function settingsView(serial: string): SettingsView {
       autostart: onOff(values.autostart_enabled),
       smart_gesture: onOff(values.smart_gesture_enabled),
       pause_mode: onOff(values.pause_mode_enabled),
+      lock: onOff(values.locked),
+      vib_heat: onOff(values.vib_heat_enabled),
+      vib_ready: onOff(values.vib_ready_enabled),
+      vib_almost: onOff(values.vib_almost_enabled),
+      vib_end: onOff(values.vib_end_enabled),
     },
     statuses,
     jobs,
