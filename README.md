@@ -30,7 +30,13 @@ browser (`Accept-Language`), overridable in the header; English is the default,
 Czech is included. To add a language, create `src/lib/i18n/<code>.ts` and
 register it in `src/lib/i18n/index.ts`.
 
-### Docker
+#Device images: `server/public/devices/*.png` are official IQOS product renders
+(all six ILUMA i ONE finishes plus ILUMA i and ILUMA i PRIME). Pick the model
+and finish per device in *Settings → Devices*; the chart colour is separate and
+defaults to a readable palette slot. To add a finish, drop a transparent PNG
+there and register it in `server/src/lib/variants.ts`.
+
+## Docker
 
 ```bash
 # on the Docker host

@@ -4,23 +4,25 @@
  * variant by dropping a PNG with a transparent background and registering it
  * here.
  */
+import { PALETTE_KEYS } from "./palette";
+
 export interface DeviceVariant {
   key: string;
   model: string;
   colour: string;
-  /** Suggested series colour: readable on light and dark surfaces, roughly matching the finish. */
-  suggestedColor: string;
+  /** Palette key closest to the finish; the device's default chart colour. */
+  paletteKey: string;
 }
 
 export const DEVICE_VARIANTS: DeviceVariant[] = [
-  { key: "iluma-i-one-midnight-black", model: "ILUMA i ONE", colour: "Midnight Black", suggestedColor: "#2a78d6" },
-  { key: "iluma-i-one-electric-purple", model: "ILUMA i ONE", colour: "Electric Purple", suggestedColor: "#6250d6" },
-  { key: "iluma-i-one-breeze-blue", model: "ILUMA i ONE", colour: "Breeze Blue", suggestedColor: "#1baf7a" },
-  { key: "iluma-i-one-leaf-green", model: "ILUMA i ONE", colour: "Leaf Green", suggestedColor: "#008300" },
-  { key: "iluma-i-one-digital-violet", model: "ILUMA i ONE", colour: "Digital Violet", suggestedColor: "#9085e9" },
-  { key: "iluma-i-one-vivid-terracotta", model: "ILUMA i ONE", colour: "Vivid Terracotta", suggestedColor: "#eb6834" },
-  { key: "iluma-i", model: "ILUMA i", colour: "Breeze Blue", suggestedColor: "#2a78d6" },
-  { key: "iluma-i-prime", model: "ILUMA i PRIME", colour: "Garnet Red", suggestedColor: "#e34948" },
+  { key: "iluma-i-one-midnight-black", model: "ILUMA i ONE", colour: "Midnight Black", paletteKey: "blue" },
+  { key: "iluma-i-one-electric-purple", model: "ILUMA i ONE", colour: "Electric Purple", paletteKey: "violet" },
+  { key: "iluma-i-one-breeze-blue", model: "ILUMA i ONE", colour: "Breeze Blue", paletteKey: "aqua" },
+  { key: "iluma-i-one-leaf-green", model: "ILUMA i ONE", colour: "Leaf Green", paletteKey: "green" },
+  { key: "iluma-i-one-digital-violet", model: "ILUMA i ONE", colour: "Digital Violet", paletteKey: "magenta" },
+  { key: "iluma-i-one-vivid-terracotta", model: "ILUMA i ONE", colour: "Vivid Terracotta", paletteKey: "orange" },
+  { key: "iluma-i", model: "ILUMA i", colour: "Breeze Blue", paletteKey: "aqua" },
+  { key: "iluma-i-prime", model: "ILUMA i PRIME", colour: "Garnet Red", paletteKey: "red" },
 ];
 
 export const DEFAULT_VARIANT = DEVICE_VARIANTS[0].key;
@@ -31,4 +33,14 @@ export function isVariant(key: unknown): key is string {
 
 export function variantImage(key: string | null | undefined): string {
   return `/devices/${isVariant(key) ? key : DEFAULT_VARIANT}.png`;
+}
+
+/**
+ * Default chart colour for a finish: its palette key, unless another device
+ * already uses it – then the first palette key nobody uses yet.
+ */
+export function defaultColorFor(variant: string, colorsInUse: string[]): string {
+  const preferred = DEVICE_VARIANTS.find((v) => v.key === variant)?.paletteKey ?? PALETTE_KEYS[0];
+  if (!colorsInUse.includes(preferred)) return preferred;
+  return PALETTE_KEYS.find((k) => !colorsInUse.includes(k)) ?? preferred;
 }

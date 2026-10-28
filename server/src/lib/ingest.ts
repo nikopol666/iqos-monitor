@@ -5,6 +5,7 @@
 import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { getDb, getSqlite, nowUtc, schema } from "@/db";
 import { decodeEvent, parseSnapshotFrames, type ClassicKey } from "@/lib/protocol";
+import { DEFAULT_VARIANT, defaultColorFor } from "@/lib/variants";
 
 export const CLOCK_JUMP_DAYS = 30;
 export const LIVE_TIMEOUT_SECONDS = 10;
@@ -14,8 +15,10 @@ const DEFAULT_NAMES: Record<string, string> = {
   DEVICEB0000002: "Modra",
 };
 
-/** Categorical palette (dataviz reference order); a new device takes the next free slot. */
-export const SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"];
+export function colorsInUse(exceptSerial?: string): string[] {
+  const rows = getSqlite().prepare("SELECT serial, color FROM devices").all() as { serial: string; color: string }[];
+  return rows.filter((r) => r.serial !== exceptSerial).map((r) => r.color);
+}
 
 export function ensureDevice(serial: string): void {
   const db = getDb();
@@ -25,9 +28,16 @@ export function ensureDevice(serial: string): void {
     db.update(schema.devices).set({ lastSeenUtc: now }).where(eq(schema.devices.serial, serial)).run();
     return;
   }
-  const count = (getSqlite().prepare("SELECT count(*) AS n FROM devices").get() as { n: number }).n;
   db.insert(schema.devices)
-    .values({ serial, name: DEFAULT_NAMES[serial] ?? serial, firstSeenUtc: now, lastSeenUtc: now, color: SERIES_COLORS[count % SERIES_COLORS.length], variant: "iluma-i-one-breeze-blue" })
+    .values({
+      serial,
+      name: DEFAULT_NAMES[serial] ?? serial,
+      firstSeenUtc: now,
+      lastSeenUtc: now,
+      variant: DEFAULT_VARIANT,
+      color: defaultColorFor(DEFAULT_VARIANT, colorsInUse()),
+      colorCustom: 0,
+    })
     .run();
 }
 

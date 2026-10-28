@@ -115,4 +115,18 @@ export const MIGRATIONS: string[] = [
     WHEN 0 THEN '#2a78d6' WHEN 1 THEN '#eb6834' WHEN 2 THEN '#1baf7a' WHEN 3 THEN '#eda100'
     WHEN 4 THEN '#e87ba4' WHEN 5 THEN '#008300' WHEN 6 THEN '#6250d6' ELSE '#e34948' END;
   `,
+  // v3 – palette keys instead of hex, colour follows the finish unless customised
+  `
+  ALTER TABLE devices ADD COLUMN color_custom INTEGER NOT NULL DEFAULT 0;
+  UPDATE devices SET color = CASE lower(color)
+    WHEN '#2a78d6' THEN 'blue' WHEN '#3987e5' THEN 'blue'
+    WHEN '#eb6834' THEN 'orange' WHEN '#d95926' THEN 'orange'
+    WHEN '#1baf7a' THEN 'aqua' WHEN '#199e70' THEN 'aqua'
+    WHEN '#eda100' THEN 'yellow' WHEN '#c98500' THEN 'yellow'
+    WHEN '#e87ba4' THEN 'magenta' WHEN '#d55181' THEN 'magenta'
+    WHEN '#008300' THEN 'green'
+    WHEN '#6250d6' THEN 'violet' WHEN '#9085e9' THEN 'violet'
+    WHEN '#e34948' THEN 'red' WHEN '#e66767' THEN 'red'
+    ELSE color END;
+  `,
 ];

@@ -8,6 +8,7 @@ import { useFormat, useI18n } from "@/lib/i18n/client";
 import type { StatsResult, GroupBy, Bucket } from "@/lib/stats";
 import type { DayRecord } from "@/lib/queries";
 import { Card, CardTitle, Notice, Stat } from "@/components/ui";
+import { colorCss } from "@/lib/palette";
 
 interface DeviceOpt {
   serial: string;
@@ -245,7 +246,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                 className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${off ? "border-border text-muted line-through" : "border-border bg-surface text-text"}`}
                 title={d.name}
               >
-                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: off ? "var(--muted)" : d.color }} aria-hidden />
+                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: off ? "var(--muted)" : colorCss(d.color) }} aria-hidden />
                 {d.name}
               </button>
             );
@@ -325,7 +326,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                                   </td>
                                   <td className="py-1.5 pr-3">
                                     <Link href={`/devices/${r.serial}`} className="inline-flex items-center gap-1.5 hover:underline">
-                                      <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: dev?.color ?? "var(--muted)" }} aria-hidden />
+                                      <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: dev ? colorCss(dev.color) : "var(--muted)" }} aria-hidden />
                                       {dev?.name ?? r.serial}
                                     </Link>
                                   </td>
@@ -385,7 +386,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
   );
 
   function Chart({ rows, metric }: { rows: Record<string, number | string>[]; metric: "sessions" | "puffs" }) {
-    const bars = series.length ? series.map((d) => ({ key: `${metric}:${d.serial}`, name: d.name, color: d.color })) : [];
+    const bars = series.length ? series.map((d) => ({ key: `${metric}:${d.serial}`, name: d.name, color: colorCss(d.color) })) : [];
     const interval = rows.length > 12 ? Math.ceil(rows.length / 12) - 1 : 0;
     return (
       <div className="h-64 w-full">

@@ -8,6 +8,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
+# The sync modules print Czech diagnostics; CI consoles may default to cp1252.
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        stream.reconfigure(encoding="utf-8", errors="replace")
+
 failed = 0
 for script in sorted((ROOT / "tests").glob("test_*.py")):
     print(f"=== {script.name}", flush=True)

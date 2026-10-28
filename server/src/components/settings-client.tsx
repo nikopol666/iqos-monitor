@@ -9,6 +9,7 @@ import { DICTIONARIES, SUPPORTED_LOCALES } from "@/lib/i18n";
 import { Card, CardTitle, Notice } from "@/components/ui";
 import { DeviceImage } from "@/components/device-image";
 import type { DeviceVariant } from "@/lib/variants";
+import { colorCss, isHexColor, lowContrastModes, type PaletteColor } from "@/lib/palette";
 
 interface DeviceRow {
   serial: string;
@@ -18,6 +19,7 @@ interface DeviceRow {
   lastSeenUtc: string | null;
   color: string;
   variant: string;
+  defaultColor: string;
 }
 interface AgentRow {
   id: number;
@@ -38,6 +40,7 @@ export function SettingsClient({
   users,
   devices,
   variants,
+  palette,
   agents,
   envKeyConfigured,
   override,
@@ -45,11 +48,12 @@ export function SettingsClient({
   users: User[];
   devices: DeviceRow[];
   variants: DeviceVariant[];
+  palette: PaletteColor[];
   agents: AgentRow[];
   envKeyConfigured: boolean;
   override: string | null;
 }) {
-  const { t } = useI18n();
+  const { t, f } = useI18n();
   const fmt = useFormat();
   const router = useRouter();
   const [newUser, setNewUser] = useState("");
@@ -171,26 +175,43 @@ export function SettingsClient({
                     ))}
                   </select>
                 </label>
-                <div className="text-xs text-text-2">
+                <div className="text-xs text-text-2 sm:col-span-2">
                   {t.settings.deviceColor}
-                  <div className="mt-1 flex items-center gap-2">
-                    <input
-                      type="color"
-                      className="h-9 w-12 cursor-pointer rounded border border-border bg-surface"
-                      defaultValue={d.color}
-                      onBlur={(e) => e.target.value !== d.color && run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, color: e.target.value }))}
-                    />
-                    <code className="font-mono text-xs">{d.color}</code>
-                    <button
-                      type="button"
-                      className="ui-btn h-8 text-xs"
-                      onClick={() => {
-                        const v = variants.find((x) => x.key === d.variant);
-                        if (v) run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, color: v.suggestedColor }));
-                      }}
-                    >
-                      {t.settings.useSuggested}
-                    </button>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {palette.map((c) => (
+                      <button
+                        key={c.key}
+                        type="button"
+                        title={c.key}
+                        aria-label={c.key}
+                        onClick={() => run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, color: c.key }))}
+                        className={`h-7 w-7 rounded-full border-2 ${d.color === c.key ? "border-text" : "border-transparent"}`}
+                        style={{ background: `var(--series-${c.key})` }}
+                      />
+                    ))}
+                    <label className="ml-1 flex items-center gap-1.5" title={t.settings.customColor}>
+                      <input
+                        type="color"
+                        className="h-7 w-9 cursor-pointer rounded border border-border bg-surface"
+                        defaultValue={isHexColor(d.color) ? d.color : "#888888"}
+                        onBlur={(e) => e.target.value !== d.color && run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, color: e.target.value }))}
+                      />
+                      <span>{t.settings.customColor}</span>
+                    </label>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5">
+                      <span className="inline-block h-3 w-3 rounded-full" style={{ background: colorCss(d.color) }} aria-hidden />
+                      <code className="font-mono">{d.color}</code>
+                    </span>
+                    {d.color === d.defaultColor ? (
+                      <span className="text-muted">{t.settings.colorFollowsFinish}</span>
+                    ) : (
+                      <button type="button" className="ui-btn h-7 text-xs" onClick={() => run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, reset_color: true }))}>
+                        {t.settings.useSuggested}
+                      </button>
+                    )}
+                    {lowContrastModes(d.color).length ? (
+                      <span className="text-warning">⚠ {f(t.settings.lowContrast, { modes: lowContrastModes(d.color).map((m) => (m === "light" ? t.settings.themeLight : t.settings.themeDark)).join(", ") })}</span>
+                    ) : null}
                   </div>
                 </div>
               </div>

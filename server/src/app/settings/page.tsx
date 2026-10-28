@@ -3,7 +3,9 @@ import { getDb, schema } from "@/db";
 import { listDevices, listUsers } from "@/lib/queries";
 import { LOCALE_COOKIE } from "@/lib/i18n";
 import { SettingsClient } from "@/components/settings-client";
-import { DEVICE_VARIANTS } from "@/lib/variants";
+import { DEVICE_VARIANTS, defaultColorFor } from "@/lib/variants";
+import { PALETTE } from "@/lib/palette";
+import { colorsInUse } from "@/lib/ingest";
 
 export default async function SettingsPage() {
   const agents = getDb()
@@ -22,8 +24,18 @@ export default async function SettingsPage() {
   return (
     <SettingsClient
       users={listUsers()}
-      devices={listDevices().map((d) => ({ serial: d.serial, name: d.name, userId: d.userId, model: d.model, lastSeenUtc: d.lastSeenUtc, color: d.color, variant: d.variant }))}
+      devices={listDevices().map((d) => ({
+        serial: d.serial,
+        name: d.name,
+        userId: d.userId,
+        model: d.model,
+        lastSeenUtc: d.lastSeenUtc,
+        color: d.color,
+        variant: d.variant,
+        defaultColor: defaultColorFor(d.variant, colorsInUse(d.serial)),
+      }))}
       variants={DEVICE_VARIANTS}
+      palette={PALETTE}
       agents={agents}
       envKeyConfigured={!!process.env.AGENT_API_KEY}
       override={override}
