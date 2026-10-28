@@ -36,7 +36,8 @@ for color,stamp,stick,puffs in [('fialova','201331',1077,14736),('modra','201341
     fake=FakeDevice(readmap)
     snap=read_snapshot(fake)
     v=snap['values']
-    assert v['battery_percent']==100,(color,v)
+    assert v['brightness_level']==0x64,(color,v)   # reg 0x24 = LED brightness (high)
+    assert v['battery_percent'] is None             # reg 0x60 not in these captures
     assert v['lifetime_sticks_candidate']==stick,(color,v)
     assert v['lifetime_puffs_candidate']==puffs,(color,v)
     assert v['model']=='42PT',(color,v)

@@ -55,8 +55,12 @@ export interface SnapshotValues {
   serial_readback: string | null;
   model: string | null;
   firmware_raw: string | null;
-  /** Register C0/00/24: LED brightness level (0x1E low / 0x64 high), NOT battery. */
+  /** Candidate: register C0/01/60 byte 2 (charge %), byte 3 temperature. */
   battery_percent: number | null;
+  battery_temp_c: number | null;
+  /** Candidate: register C0/01/20 byte 0 == 1 while charging. */
+  charging: boolean | null;
+  /** Register C0/00/24: LED brightness level (0x1E low / 0x64 high). */
   brightness_level: number | null;
   status_60_raw: string | null;
   status_long_raw: string | null;
@@ -124,7 +128,10 @@ export function parseSnapshotFrames(frames: Partial<Record<ClassicKey, string>>)
     serial_readback: payloads.serial ? asciiPayload(payloads.serial) : null,
     model: payloads.model ? asciiPayload(payloads.model) : null,
     firmware_raw: hexOrNull("firmware"),
-    battery_percent: payloads.battery ? u16le(payloads.battery, 0) : null,
+    // Candidate battery layout from register C0/01/60: [u16 raw, charge %, temperature C].
+    battery_percent: payloads.status_60 && payloads.status_60.length >= 4 ? payloads.status_60[2] : null,
+    battery_temp_c: payloads.status_60 && payloads.status_60.length >= 4 ? payloads.status_60[3] : null,
+    charging: payloads.stick_state && payloads.stick_state.length ? payloads.stick_state[0] === 1 : null,
     brightness_level: payloads.battery && payloads.battery.length ? payloads.battery[0] : null,
     status_60_raw: hexOrNull("status_60"),
     status_long_raw: hexOrNull("status_long"),

@@ -20,11 +20,17 @@ def read_live(dev) -> dict:
         time.sleep(0.02)
     counters = payloads.get("counters", b"")
     quarter = u32(counters, 6)
+    s60 = payloads.get("status_60", b"")
     return {
-        "battery": u16(payloads.get("battery", b""), 0),  # C0/00/24 = LED brightness level, see device_info
+        # Reg C0/01/60: [u16 raw, charge %, temperature C] – candidate layout, see PROTOCOL.md
+        "battery": s60[2] if len(s60) >= 4 else None,
+        "battery_temp_c": s60[3] if len(s60) >= 4 else None,
+        "battery_raw": u16(s60, 0) if len(s60) >= 2 else None,
         "brightness_level": payloads["battery"][0] if payloads.get("battery") else None,
-        "status_60_raw": payloads["status_60"].hex() if payloads.get("status_60") else None,
+        "status_60_raw": s60.hex() if s60 else None,
+        # Reg C0/01/20 byte 0 toggles 01/00 without any session: 01 = charging (candidate), not "stick inserted"
         "stick_state": payloads["stick_state"][:1].hex() if payloads.get("stick_state") else None,
+        "charging": (payloads["stick_state"][0] == 1) if payloads.get("stick_state") else None,
         "error_state": u16(payloads.get("error_state", b""), 0),
         "lifetime_sticks": u32(counters, 0),
         "lifetime_puffs": u32(counters, 10),

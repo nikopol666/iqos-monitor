@@ -53,6 +53,7 @@ export function ConnectedStrip() {
               <img src={variantImage(d.variant)} alt="" className="relative h-7 w-auto object-contain" draggable={false} />
             </span>
             <span className="hidden max-w-[8rem] truncate sm:inline lg:hidden xl:inline xl:max-w-[12rem]">{d.name}</span>
+            {d.lifetime.battery != null ? <span className="tabular">{d.lifetime.battery} %</span> : null}
             {d.sync ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-1.5 py-0.5 text-accent" title={d.sync.total ? f(t.overview.syncing, { done: d.sync.done, total: d.sync.total }) : t.overview.syncingShort}>
                 <ArrowDownUp size={12} className="anim-transfer" aria-hidden />

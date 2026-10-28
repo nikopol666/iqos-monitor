@@ -136,7 +136,8 @@ describe("classic diagnostics (test_diagnostics.py port)", () => {
         if (status === "ok" || status === "unsupported") frames[key] = rec.frame;
       }
       const snap = parseSnapshotFrames(frames);
-      expect(snap.values.battery_percent).toBe(100);
+      expect(snap.values.brightness_level).toBe(0x64); // reg 0x24 is the LED brightness, high
+      expect(snap.values.battery_percent).toBeNull(); // reg 0x60 was not captured back then
       expect(snap.values.lifetime_sticks_candidate).toBe(sticks);
       expect(snap.values.lifetime_puffs_candidate).toBe(puffs);
       expect(snap.values.model).toBe("42PT");

@@ -122,8 +122,12 @@ def read_snapshot(dev):
     # Register C0/00/24 follows the LED brightness (0x1E low / 0x64 high) in the
     # official-app capture; it is kept under its old key for compatibility but
     # must not be shown as battery.
-    values['battery_percent']=u16(payloads.get('battery',b''),0)
+    s60=payloads.get('status_60',b'')
+    values['battery_percent']=s60[2] if len(s60)>=4 else None      # candidate: reg C0/01/60 byte 2
+    values['battery_temp_c']=s60[3] if len(s60)>=4 else None
+    values['battery_raw']=u16(s60,0) if len(s60)>=2 else None
     values['brightness_level']=payloads['battery'][0] if payloads.get('battery') else None
+    values['charging']=(payloads['stick_state'][0]==1) if payloads.get('stick_state') else None
     values['status_60_raw']=payloads.get('status_60',b'').hex() or None
     values['status_long_raw']=payloads.get('status_long',b'').hex() or None
     values['stick_state_code']=payloads.get('stick_state',b'')[:1].hex() or None

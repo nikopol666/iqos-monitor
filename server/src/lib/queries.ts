@@ -21,6 +21,9 @@ export interface DeviceOverview {
   /** Archive transfer in progress (agent live status or running job). */
   sync: { mode: "recent" | "full"; done: number; total: number | null } | null;
   lifetime: { sticks: number | null; puffs: number | null; seconds: number | null; battery: number | null };
+  /** Candidates from live state / snapshot: charging flag, LED brightness level. */
+  charging: boolean | null;
+  brightness: number | null;
   clockWarning: boolean;
   fullHistoryComplete: boolean;
   ackedNextIndex: number | null;
@@ -65,14 +68,19 @@ function todayCounts(serial: string): { records: number; sessions: number; puffs
   return { records: row.records, sessions: row.sessions ?? 0, puffs: row.puffs ?? 0 };
 }
 
+function num(v: unknown): number | null {
+  return typeof v === "number" ? v : null;
+}
+
 export function deviceOverview(device: schema.Device, siblings: schema.Device[] = listDevices()): DeviceOverview {
   const db = getDb();
   const live = db.select().from(schema.liveState).where(eq(schema.liveState.serial, device.serial)).get() ?? null;
   const user = device.userId ? (db.select().from(schema.users).where(eq(schema.users.id, device.userId)).get() ?? null) : null;
   const snap = latestSnapshot(device.serial);
-  const values = snap ? (JSON.parse(snap.valuesJson) as Record<string, number | null>) : {};
+  const values = snap ? (JSON.parse(snap.valuesJson) as Record<string, number | boolean | null>) : {};
   const connected = isLiveConnected(live);
   const job = latestJob(device.serial);
+  const extra = (live?.extraJson ? JSON.parse(live.extraJson) : {}) as { charging?: boolean | null; brightness_level?: number | null };
   let sync: DeviceOverview["sync"] = null;
   if (connected) {
     if (job && job.status === "running") sync = { mode: "full", done: job.progressDone, total: job.progressTotal };
@@ -95,11 +103,13 @@ export function deviceOverview(device: schema.Device, siblings: schema.Device[] 
     job: job && (job.status === "queued" || job.status === "running") ? { id: job.id, type: job.type, status: job.status, done: job.progressDone, total: job.progressTotal, message: job.message } : null,
     sync,
     lifetime: {
-      sticks: connected && live?.lifetimeSticks != null ? live.lifetimeSticks : (values.lifetime_sticks_candidate ?? live?.lifetimeSticks ?? null),
-      puffs: connected && live?.lifetimePuffs != null ? live.lifetimePuffs : (values.lifetime_puffs_candidate ?? live?.lifetimePuffs ?? null),
-      seconds: connected && live?.lifetimeSeconds != null ? live.lifetimeSeconds : (values.lifetime_seconds_candidate ?? live?.lifetimeSeconds ?? null),
-      battery: connected ? (live?.battery ?? null) : (live?.battery ?? values.battery_percent ?? null),
+      sticks: connected && live?.lifetimeSticks != null ? live.lifetimeSticks : (num(values.lifetime_sticks_candidate) ?? live?.lifetimeSticks ?? null),
+      puffs: connected && live?.lifetimePuffs != null ? live.lifetimePuffs : (num(values.lifetime_puffs_candidate) ?? live?.lifetimePuffs ?? null),
+      seconds: connected && live?.lifetimeSeconds != null ? live.lifetimeSeconds : (num(values.lifetime_seconds_candidate) ?? live?.lifetimeSeconds ?? null),
+      battery: connected ? (live?.battery ?? null) : (live?.battery ?? num(values.battery_percent) ?? null),
     },
+    charging: extra.charging ?? (typeof values.charging === "boolean" ? values.charging : null),
+    brightness: extra.brightness_level ?? (typeof values.brightness_level === "number" ? values.brightness_level : null),
     clockWarning: !!device.clockWarning,
     fullHistoryComplete: !!device.fullHistoryComplete,
     ackedNextIndex: device.ackedNextIndex,

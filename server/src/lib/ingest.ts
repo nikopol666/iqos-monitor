@@ -221,6 +221,8 @@ export interface IncomingLive {
   connected?: boolean;
   brightness_level?: number | null;
   status_60_raw?: string | null;
+  battery_temp_c?: number | null;
+  charging?: boolean | null;
 }
 
 export function updateLive(serial: string, agentId: number | null, live: IncomingLive): void {
@@ -240,7 +242,7 @@ export function updateLive(serial: string, agentId: number | null, live: Incomin
     sessionRaw: live.session_raw ?? null,
     syncStatus: live.sync_status ?? null,
     disconnectedUtc: live.connected === false ? now : null,
-    extraJson: JSON.stringify({ brightness_level: live.brightness_level ?? null, status_60_raw: live.status_60_raw ?? null }),
+    extraJson: JSON.stringify({ brightness_level: live.brightness_level ?? null, status_60_raw: live.status_60_raw ?? null, battery_temp_c: live.battery_temp_c ?? null, charging: live.charging ?? null }),
   };
   if (live.connected === false) {
     // Keep the last known values, only mark the disconnect.

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { memo, useEffect, useState } from "react";
-import { Cable, CircleDot, Sun, Usb } from "lucide-react";
+import { BatteryCharging, BatteryMedium, Cable, Sun, Usb } from "lucide-react";
 import type { DeviceOverview } from "@/lib/queries";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import { Badge, Empty } from "@/components/ui";
@@ -72,8 +72,7 @@ export function OverviewClient({ initial, middle }: { initial: DeviceOverview[];
 const DeviceCard = memo(function DeviceCard({ d }: { d: DeviceOverview }) {
   const { t, f } = useI18n();
   const fmt = useFormat();
-  const stickIn = d.live?.stickState === "01";
-  const brightness = d.lifetime.battery == null ? "—" : d.lifetime.battery === 100 ? t.overview.brightnessHigh : d.lifetime.battery === 30 ? t.overview.brightnessLow : `${d.lifetime.battery}`;
+  const brightness = d.brightness == null ? "—" : d.brightness === 0x64 ? t.overview.brightnessHigh : d.brightness === 0x1e ? t.overview.brightnessLow : `${d.brightness}`;
   return (
     <Link
       href={`/devices/${d.serial}`}
@@ -81,8 +80,8 @@ const DeviceCard = memo(function DeviceCard({ d }: { d: DeviceOverview }) {
       style={{ borderTopColor: colorCss(d.color), borderTopWidth: 3 }}
     >
       <div className="flex gap-3 sm:gap-4">
-        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={150} connected={d.connected} className="hidden sm:flex" />
-        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} className="sm:hidden" />
+        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={150} connected={d.connected} battery={d.lifetime.battery} className="hidden sm:flex" />
+        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} battery={d.lifetime.battery} className="sm:hidden" />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -112,17 +111,12 @@ const DeviceCard = memo(function DeviceCard({ d }: { d: DeviceOverview }) {
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-2 text-sm min-[420px]:grid-cols-2">
-            <Metric label={t.overview.battery} value={brightness} icon={<Sun size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />} />
             <Metric
-              label={d.connected ? (stickIn ? t.overview.stickInserted : t.overview.stickEmpty) : t.overview.today}
-              value={
-                d.connected ? (
-                  <CircleDot size={18} aria-hidden className={stickIn ? "text-accent" : "text-muted"} />
-                ) : (
-                  `${fmt.integer(d.today.sessions)} / ${fmt.integer(d.today.puffs)}`
-                )
-              }
+              label={d.connected && d.charging != null ? (d.charging ? t.overview.charging : t.overview.charged) : t.overview.battery}
+              value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
+              icon={d.connected && d.charging ? <BatteryCharging size={16} aria-hidden className="text-good" /> : <BatteryMedium size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
             />
+            <Metric label={t.overview.brightness} value={brightness} icon={<Sun size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />} />
             <Metric label={t.overview.lifetimeSticks} value={fmt.integer(d.lifetime.sticks)} />
             <Metric label={t.overview.lifetimePuffs} value={fmt.integer(d.lifetime.puffs)} />
           </div>
