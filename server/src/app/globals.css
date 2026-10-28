@@ -28,6 +28,7 @@
   --series-green: #008300;
   --series-violet: #6250d6;
   --series-red: #e34948;
+  --series-graphite: #4a5061;
   --good: #0ca30c;
   --warning: #fab219;
   --serious: #ec835a;
@@ -63,6 +64,7 @@
     --series-green: #008300;
     --series-violet: #9085e9;
     --series-red: #e66767;
+    --series-graphite: #b4bac6;
     --grid: #2a2a28;
   }
 }
@@ -94,6 +96,7 @@
   --series-green: #008300;
   --series-violet: #9085e9;
   --series-red: #e66767;
+  --series-graphite: #b4bac6;
   --grid: #2a2a28;
 }
 

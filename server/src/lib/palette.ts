@@ -19,6 +19,8 @@ export const PALETTE: PaletteColor[] = [
   { key: "green", light: "#008300", dark: "#008300" },
   { key: "violet", light: "#6250d6", dark: "#9085e9" },
   { key: "red", light: "#e34948", dark: "#e66767" },
+  /* Neutral for black / grey finishes: dark slate on light, light grey on dark. */
+  { key: "graphite", light: "#4a5061", dark: "#b4bac6" },
 ];
 
 export const PALETTE_KEYS = PALETTE.map((p) => p.key);

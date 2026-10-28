@@ -129,4 +129,8 @@ export const MIGRATIONS: string[] = [
     WHEN '#e34948' THEN 'red' WHEN '#e66767' THEN 'red'
     ELSE color END;
   `,
+  // v4 – black finishes default to the neutral graphite series colour
+  `
+  UPDATE devices SET color = 'graphite' WHERE variant = 'iluma-i-one-midnight-black' AND color_custom = 0;
+  `,
 ];

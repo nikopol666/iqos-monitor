@@ -15,7 +15,7 @@ export interface DeviceVariant {
 }
 
 export const DEVICE_VARIANTS: DeviceVariant[] = [
-  { key: "iluma-i-one-midnight-black", model: "ILUMA i ONE", colour: "Midnight Black", paletteKey: "blue" },
+  { key: "iluma-i-one-midnight-black", model: "ILUMA i ONE", colour: "Midnight Black", paletteKey: "graphite" },
   { key: "iluma-i-one-electric-purple", model: "ILUMA i ONE", colour: "Electric Purple", paletteKey: "violet" },
   { key: "iluma-i-one-breeze-blue", model: "ILUMA i ONE", colour: "Breeze Blue", paletteKey: "aqua" },
   { key: "iluma-i-one-leaf-green", model: "ILUMA i ONE", colour: "Leaf Green", paletteKey: "green" },
