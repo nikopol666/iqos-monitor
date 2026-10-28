@@ -127,6 +127,7 @@ body {
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
 }
 
 .tabular {
@@ -141,10 +142,13 @@ textarea {
 }
 
 .ui-input {
-  @apply h-9 rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus:border-accent;
+  @apply h-9 min-w-0 rounded-md border border-border bg-surface px-3 text-sm text-text outline-none focus:border-accent;
 }
 .ui-btn {
   @apply inline-flex h-9 items-center gap-2 rounded-md border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50;
+}
+.ui-input-sm {
+  @apply h-8 px-2 text-xs;
 }
 .ui-btn-primary {
   @apply border-accent bg-accent text-accent-ink hover:opacity-90;

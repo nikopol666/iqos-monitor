@@ -50,8 +50,8 @@ export function ConnectedStrip() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={variantImage(d.variant)} alt="" className="relative h-7 w-auto object-contain" draggable={false} />
             </span>
-            <span className="hidden sm:inline">{d.name}</span>
-            <span className="relative h-1.5 w-8 overflow-hidden rounded-full bg-border" aria-hidden>
+            <span className="hidden max-w-[10rem] truncate md:inline">{d.name}</span>
+            <span className="relative hidden h-1.5 w-8 overflow-hidden rounded-full bg-border sm:block" aria-hidden>
               <span className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700" style={{ width: `${level ?? 0}%`, background: tone }} />
               <span className="anim-sheen absolute inset-y-0 w-1/3" />
             </span>

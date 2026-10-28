@@ -58,14 +58,15 @@ export function OverviewClient({ initial }: { initial: DeviceOverview[] }) {
         className="ui-card relative block overflow-hidden p-4 transition-colors hover:border-accent sm:p-5"
         style={{ borderTopColor: colorCss(d.color), borderTopWidth: 3 }}
       >
-        <div className="flex gap-4">
-          <DeviceImage variant={d.variant} color={d.color} name={d.name} size={150} connected={d.connected} battery={d.lifetime.battery} />
+        <div className="flex gap-3 sm:gap-4">
+          <DeviceImage variant={d.variant} color={d.color} name={d.name} size={150} connected={d.connected} battery={d.lifetime.battery} className="hidden xs:flex sm:flex" />
+          <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} battery={d.lifetime.battery} className="sm:hidden" />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-block h-3 w-3 rounded-full" style={{ background: colorCss(d.color) }} aria-hidden />
-                  <span className="truncate text-lg font-semibold">{d.name}</span>
+                  <span className="break-words text-base font-semibold leading-tight sm:text-lg">{d.name}</span>
                   {d.user ? (
                     <span className="inline-flex items-center gap-1 text-xs text-text-2">
                       <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: d.user.color }} aria-hidden />
@@ -88,7 +89,7 @@ export function OverviewClient({ initial }: { initial: DeviceOverview[] }) {
               )}
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <div className="mt-3 grid grid-cols-1 gap-2 text-sm min-[420px]:grid-cols-2">
               <Metric
                 label={t.overview.battery}
                 value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}

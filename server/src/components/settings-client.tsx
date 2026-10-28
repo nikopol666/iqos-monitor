@@ -129,10 +129,10 @@ export function SettingsClient({
         {devices.length === 0 ? <Notice tone="info">{t.overview.empty}</Notice> : null}
         <ul className="divide-y divide-border">
           {devices.map((d) => (
-            <li key={d.serial} className="flex flex-wrap items-center gap-3 py-3">
-              <DeviceImage variant={d.variant} color={d.color} name={d.label} size={96} />
-              <div className="grid flex-1 gap-2 sm:grid-cols-2">
-                <div className="sm:col-span-2">
+            <li key={d.serial} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:gap-5">
+              <DeviceImage variant={d.variant} color={d.color} name={d.label} size={190} className="mx-auto sm:mx-0" />
+              <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="sm:col-span-2 lg:col-span-3">
                   <div className="font-mono text-xs text-muted">{d.serial}</div>
                   <div className="text-xs text-muted">
                     {d.model ?? ""} {d.lastSeenUtc ? `· ${fmt.dateTime(d.lastSeenUtc)}` : ""}
@@ -141,7 +141,7 @@ export function SettingsClient({
                 <label className="text-xs text-text-2">
                   {t.settings.deviceName}
                   <input
-                    className="ui-input mt-1 w-full"
+                    className="ui-input ui-input-sm mt-1 w-full"
                     placeholder={d.label}
                     value={deviceNames[d.serial] ?? ""}
                     onChange={(e) => setDeviceNames({ ...deviceNames, [d.serial]: e.target.value })}
@@ -151,7 +151,7 @@ export function SettingsClient({
                 <label className="text-xs text-text-2">
                   {t.settings.owner}
                   <select
-                    className="ui-input mt-1 w-full"
+                    className="ui-input ui-input-sm mt-1 w-full"
                     value={d.userId ?? ""}
                     onChange={(e) => run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, user_id: e.target.value ? Number(e.target.value) : null }))}
                   >
@@ -166,7 +166,7 @@ export function SettingsClient({
                 <label className="text-xs text-text-2">
                   {t.settings.deviceImage}
                   <select
-                    className="ui-input mt-1 w-full"
+                    className="ui-input ui-input-sm mt-1 w-full"
                     value={d.variant}
                     onChange={(e) => run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, variant: e.target.value }))}
                   >
@@ -177,7 +177,7 @@ export function SettingsClient({
                     ))}
                   </select>
                 </label>
-                <div className="text-xs text-text-2 sm:col-span-2">
+                <div className="text-xs text-text-2 sm:col-span-2 lg:col-span-3">
                   {t.settings.deviceColor}
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     {palette.map((c) => (
@@ -187,14 +187,14 @@ export function SettingsClient({
                         title={c.key}
                         aria-label={c.key}
                         onClick={() => run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, color: c.key }))}
-                        className={`h-7 w-7 rounded-full border-2 ${d.color === c.key ? "border-text" : "border-transparent"}`}
+                        className={`h-6 w-6 rounded-full border-2 ${d.color === c.key ? "border-text" : "border-transparent"}`}
                         style={{ background: `var(--series-${c.key})` }}
                       />
                     ))}
                     <label className="ml-1 flex items-center gap-1.5" title={t.settings.customColor}>
                       <input
                         type="color"
-                        className="h-7 w-9 cursor-pointer rounded border border-border bg-surface"
+                        className="h-6 w-8 cursor-pointer rounded border border-border bg-surface"
                         defaultValue={isHexColor(d.color) ? d.color : "#888888"}
                         onBlur={(e) => e.target.value !== d.color && run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, color: e.target.value }))}
                       />

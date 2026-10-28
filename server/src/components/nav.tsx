@@ -31,9 +31,10 @@ export function Nav({ override, theme }: { override: string | null; theme: Theme
   }
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur">
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:px-6">
-        <Link href="/" className="font-semibold tracking-tight">
-          {t.app.title}
+      <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-6">
+        <Link href="/" className="shrink-0 font-semibold tracking-tight">
+          <span className="sm:hidden">IQOS</span>
+          <span className="hidden sm:inline">{t.app.title}</span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">
           {links.map(({ href, label, icon: Icon }) => {
@@ -50,13 +51,13 @@ export function Nav({ override, theme }: { override: string | null; theme: Theme
             );
           })}
         </nav>
-        <div className="mx-auto">
+        <div className="mx-auto min-w-0">
           <ConnectedStrip />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <ThemeToggle initial={theme} />
           <select
-            className="ui-input h-8 text-xs"
+            className="ui-input h-8 w-auto max-w-[6.5rem] text-xs sm:max-w-none"
             value={override ?? ""}
             disabled={busy}
             onChange={(e) => changeLang(e.target.value)}
