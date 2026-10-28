@@ -119,6 +119,8 @@ def read_snapshot(dev):
     values['serial_readback']=ascii_payload('serial')
     values['model']=ascii_payload('model')
     values['firmware_raw']=payloads.get('firmware',b'').hex() or None
+    fw=payloads.get('firmware',b'')
+    values['firmware_version']=f'{fw[2]}.{fw[3]}.{fw[4]}' if len(fw)>=5 else None   # app shows 150.6.1 for 96 06 01
     # Register C0/00/24 follows the LED brightness (0x1E low / 0x64 high) in the
     # official-app capture; it is kept under its old key for compatibility but
     # must not be shown as battery.

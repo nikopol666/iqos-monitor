@@ -86,7 +86,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
   const rows: [string, React.ReactNode][] = [
     [t.device.model, v.model ?? d.model ?? "—"],
     [t.device.serial, <span key="s" className="font-mono">{d.serial}</span>],
-    [t.device.firmware, <span key="f" className="font-mono text-xs">{v.firmware_raw ?? "—"}</span>],
+    [t.device.firmware, v.firmware_version ? <span key="f" title={String(v.firmware_raw ?? "")}>{String(v.firmware_version)}</span> : <span key="f" className="font-mono text-xs">{v.firmware_raw ?? "—"}</span>],
     [t.device.battery, d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`],
     [t.device.chargingLabel, d.charging == null ? "—" : d.charging ? t.common.yes : t.common.no],
     [t.device.batteryTemp, typeof v.battery_temp_c === "number" ? `${v.battery_temp_c} °C` : "—"],

@@ -55,6 +55,8 @@ export interface SnapshotValues {
   serial_readback: string | null;
   model: string | null;
   firmware_raw: string | null;
+  /** Bytes 2..4 of the firmware reply, e.g. 150.6.1 as shown by the official app. */
+  firmware_version: string | null;
   /** Candidate: register C0/01/60 byte 2 (charge %), byte 3 temperature. */
   battery_percent: number | null;
   battery_temp_c: number | null;
@@ -128,6 +130,7 @@ export function parseSnapshotFrames(frames: Partial<Record<ClassicKey, string>>)
     serial_readback: payloads.serial ? asciiPayload(payloads.serial) : null,
     model: payloads.model ? asciiPayload(payloads.model) : null,
     firmware_raw: hexOrNull("firmware"),
+    firmware_version: payloads.firmware && payloads.firmware.length >= 5 ? `${payloads.firmware[2]}.${payloads.firmware[3]}.${payloads.firmware[4]}` : null,
     // Candidate battery layout from register C0/01/60: [u16 raw, charge %, temperature C].
     battery_percent: payloads.status_60 && payloads.status_60.length >= 4 ? payloads.status_60[2] : null,
     battery_temp_c: payloads.status_60 && payloads.status_60.length >= 4 ? payloads.status_60[3] : null,
