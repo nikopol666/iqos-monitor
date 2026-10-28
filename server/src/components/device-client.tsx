@@ -195,7 +195,6 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples }
                 <tr>
                   <th className="py-1.5 pr-3 font-medium">{t.device.colId}</th>
                   <th className="py-1.5 pr-3 font-medium">{t.device.colTime}</th>
-                  <th className="py-1.5 pr-3 font-medium">{t.device.endNotice}</th>
                   <th className="py-1.5 pr-3 text-right font-medium">{t.device.colPuffs}</th>
                   <th className="py-1.5 pr-3 font-medium">{t.device.colStatus}</th>
                   <th className="py-1.5 font-medium">{t.device.colHex}</th>
@@ -209,11 +208,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples }
                       {fmt.dateTimeSec(e.timestampUtc)}
                       {e.clockSuspect ? <span title={t.device.clockSuspect}> ⚠</span> : null}
                     </td>
-                    <td className="py-1.5 pr-3 whitespace-nowrap text-text-2">{e.endNoticeUtc ? fmt.time(e.endNoticeUtc) + " *" : "—"}</td>
-                    <td className="py-1.5 pr-3 text-right">
-                      {e.puffCount ?? (e.puffsEstimate != null ? `≈ ${e.puffsEstimate}` : "—")}
-                      {e.puffCount != null && e.puffsEstimate != null && e.puffsEstimate !== e.puffCount ? " ⚠" : ""}
-                    </td>
+                    <td className="py-1.5 pr-3 text-right">{e.puffCount ?? "—"}</td>
                     <td className="py-1.5 pr-3 text-xs">{(t.status as Record<string, string>)[e.status] ?? e.status}</td>
                     <td className="py-1.5">
                       {e.responseHex ? (

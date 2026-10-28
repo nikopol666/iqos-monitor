@@ -18,6 +18,8 @@ export interface DeviceOverview {
   lastSeenUtc: string | null;
   today: { records: number; sessions: number; puffs: number };
   job: { id: number; type: string; status: string; done: number; total: number | null; message: string | null } | null;
+  /** Archive transfer in progress (agent live status or running job). */
+  sync: { mode: "recent" | "full"; done: number; total: number | null } | null;
   lifetime: { sticks: number | null; puffs: number | null; seconds: number | null; battery: number | null };
   clockWarning: boolean;
   fullHistoryComplete: boolean;
@@ -71,6 +73,14 @@ export function deviceOverview(device: schema.Device, siblings: schema.Device[] 
   const values = snap ? (JSON.parse(snap.valuesJson) as Record<string, number | null>) : {};
   const connected = isLiveConnected(live);
   const job = latestJob(device.serial);
+  let sync: DeviceOverview["sync"] = null;
+  if (connected) {
+    if (job && job.status === "running") sync = { mode: "full", done: job.progressDone, total: job.progressTotal };
+    else if (live?.syncStatus) {
+      const m = /^(recent|full)\s+(\d+)(?:\/(\d+))?/.exec(live.syncStatus);
+      if (m) sync = { mode: m[1] as "recent" | "full", done: Number(m[2]), total: m[3] ? Number(m[3]) : null };
+    }
+  }
   return {
     serial: device.serial,
     name: deviceLabel(device.name, device.variant, device.serial, siblings),
@@ -83,6 +93,7 @@ export function deviceOverview(device: schema.Device, siblings: schema.Device[] 
     lastSeenUtc: device.lastSeenUtc,
     today: todayCounts(device.serial),
     job: job && (job.status === "queued" || job.status === "running") ? { id: job.id, type: job.type, status: job.status, done: job.progressDone, total: job.progressTotal, message: job.message } : null,
+    sync,
     lifetime: {
       sticks: connected && live?.lifetimeSticks != null ? live.lifetimeSticks : (values.lifetime_sticks_candidate ?? live?.lifetimeSticks ?? null),
       puffs: connected && live?.lifetimePuffs != null ? live.lifetimePuffs : (values.lifetime_puffs_candidate ?? live?.lifetimePuffs ?? null),

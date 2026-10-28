@@ -31,7 +31,7 @@ export function Nav({ override, theme }: { override: string | null; theme: Theme
   }
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur">
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-6">
+      <div className="mx-auto flex min-h-14 w-full max-w-6xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6 lg:flex-nowrap lg:py-0">
         <Link href="/" className="shrink-0 font-semibold tracking-tight">
           <span className="sm:hidden">IQOS</span>
           <span className="hidden sm:inline">{t.app.title}</span>
@@ -51,10 +51,10 @@ export function Nav({ override, theme }: { override: string | null; theme: Theme
             );
           })}
         </nav>
-        <div className="mx-auto min-w-0">
+        <div className="order-last w-full min-w-0 lg:order-none lg:mx-2 lg:w-auto lg:flex-1">
           <ConnectedStrip />
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2 lg:ml-0">
           <ThemeToggle initial={theme} />
           <select
             className="ui-input h-8 w-auto max-w-[6.5rem] text-xs sm:max-w-none"

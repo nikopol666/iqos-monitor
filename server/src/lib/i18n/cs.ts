@@ -42,6 +42,7 @@ export const cs: Dictionary = {
     todaySticks: "{n} náplní",
     todayPuffs: "{n} potáhnutí",
     syncing: "Synchronizace {done}/{total}",
+    syncingShort: "Přenos záznamů",
     lastSeen: "Naposledy {time}",
     detail: "Detail",
     agentOffline: "Agent se nehlásí",

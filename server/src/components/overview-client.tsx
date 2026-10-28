@@ -125,12 +125,10 @@ export function OverviewClient({ initial }: { initial: DeviceOverview[] }) {
               {d.live?.disconnectedUtc ? f(t.overview.offlineSince, { time: fmt.dateTime(d.live.disconnectedUtc) }) : d.lastSeenUtc ? f(t.overview.lastSeen, { time: fmt.dateTime(d.lastSeenUtc) }) : t.overview.neverConnected}
             </span>
           ) : null}
-          {d.job ? (
-            <span className="text-accent">
-              {d.job.status === "running" && d.job.total ? f(t.overview.syncing, { done: d.job.done, total: d.job.total }) : t.device.jobQueued}
-            </span>
-          ) : d.live?.syncStatus && d.connected ? (
-            <span className="text-accent">{d.live.syncStatus}</span>
+          {d.sync ? (
+            <span className="text-accent">{d.sync.total ? f(t.overview.syncing, { done: d.sync.done, total: d.sync.total }) : `${t.overview.syncingShort} · ${d.sync.done}`}</span>
+          ) : d.job ? (
+            <span className="text-accent">{t.device.jobQueued}</span>
           ) : null}
         </div>
       </Link>

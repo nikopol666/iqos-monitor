@@ -186,7 +186,12 @@ textarea {
 }
 .anim-pulse-dot { animation: pulse-dot 1.8s ease-out infinite; }
 .anim-pop { animation: pop 0.3s ease-out; }
+@keyframes transfer {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(-2px); opacity: 0.6; }
+}
+.anim-transfer { animation: transfer 0.9s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .anim-breathe, .anim-float, .anim-sheen, .anim-pulse-dot, .anim-pop { animation: none; }
+  .anim-breathe, .anim-float, .anim-sheen, .anim-pulse-dot, .anim-pop, .anim-transfer { animation: none; }
   .anim-breathe { opacity: 0.5; }
 }
