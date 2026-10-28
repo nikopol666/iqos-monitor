@@ -49,8 +49,9 @@ export function ShortTermClient({ initial }: { initial: Payload }) {
       data.days.map((d) => {
         const row: Row = { day: d.day, label: shortDateKey(d.day), full: dateKey(d.day), sessions: d.sessions, puffs: d.puffs };
         for (const dev of data.devices) {
-          row[`s:${dev.serial}`] = d.perSerial[dev.serial]?.sessions ?? 0;
-          row[`p:${dev.serial}`] = d.perSerial[dev.serial]?.puffs ?? 0;
+          const ps = d.perSerial[dev.serial];
+          row[`s:${dev.serial}`] = ps?.sessions ?? 0;
+          row[`p:${dev.serial}`] = ps && ps.sessions ? Math.round((ps.puffs / ps.sessions) * 10) / 10 : 0;
         }
         return row;
       }),
@@ -69,23 +70,19 @@ export function ShortTermClient({ initial }: { initial: Payload }) {
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label={t.short.todaySticks} value={fmt.integer(tot.today.sessions)} hint={`${t.short.yesterday}: ${fmt.integer(tot.yesterday.sessions)} ${delta(tot.today.sessions, tot.yesterday.sessions)}`} />
-        <Stat label={t.short.todayPuffs} value={fmt.integer(tot.today.puffs)} hint={`${t.short.yesterday}: ${fmt.integer(tot.yesterday.puffs)} ${delta(tot.today.puffs, tot.yesterday.puffs)}`} />
+        <Stat label={t.short.todayPuffsPerStick} value={fmt.number(tot.derived.todayPuffsPerStick)} hint={`${t.short.yesterday}: ${fmt.number(tot.derived.yesterdayPuffsPerStick)}`} />
         <Stat
-          label={t.short.weekSticks}
-          value={fmt.integer(tot.week.sessions)}
-          hint={`${f(t.short.perDay, { n: fmt.number(Math.round((tot.week.sessions / Math.max(1, tot.week.days)) * 10) / 10) })} · ${t.short.lastWeek}: ${fmt.integer(tot.lastWeek.sessions)}`}
+          label={t.short.weekSticksPerDay}
+          value={fmt.number(tot.derived.weekSticksPerDay)}
+          hint={`${f(t.short.totalWeek, { n: fmt.integer(tot.week.sessions) })} · ${t.short.lastWeek}: ${f(t.short.perDay, { n: fmt.number(tot.derived.lastWeekSticksPerDay) })}`}
         />
-        <Stat
-          label={t.short.weekPuffs}
-          value={fmt.integer(tot.week.puffs)}
-          hint={`${f(t.short.perDay, { n: fmt.integer(Math.round(tot.week.puffs / Math.max(1, tot.week.days))) })} · ${t.short.lastWeek}: ${fmt.integer(tot.lastWeek.puffs)}`}
-        />
+        <Stat label={t.short.weekPuffsPerStick} value={fmt.number(tot.derived.weekPuffsPerStick)} hint={`${t.short.lastWeek}: ${fmt.number(tot.derived.lastWeekPuffsPerStick)}`} />
       </div>
       <Card>
-        <CardTitle right={<span className="text-xs text-muted">{f(t.short.avg7, { sticks: fmt.number(tot.avg7.sessions), puffs: fmt.integer(tot.avg7.puffs) })}</span>}>{t.short.last7}</CardTitle>
+        <CardTitle right={<span className="text-xs text-muted">{f(t.short.avg7, { sticks: fmt.number(tot.avg7.sessions), puffs: fmt.number(tot.derived.avg7PuffsPerStick) })}</span>}>{t.short.last7}</CardTitle>
         <div className="grid gap-4 md:grid-cols-2">
           <MiniChart title={t.stats.sticks} prefix="s" rows={rows} devices={data.devices} />
-          <MiniChart title={t.stats.puffs} prefix="p" rows={rows} devices={data.devices} />
+          <MiniChart title={t.short.puffsPerStick} prefix="p" rows={rows} devices={data.devices} stacked={false} />
         </div>
         {multi ? (
           <div className="mt-2 flex flex-wrap gap-3 text-xs text-text-2">
@@ -102,7 +99,7 @@ export function ShortTermClient({ initial }: { initial: Payload }) {
   );
 }
 
-const MiniChart = memo(function MiniChart({ title, prefix, rows, devices }: { title: string; prefix: "s" | "p"; rows: Row[]; devices: { serial: string; name: string; color: string }[] }) {
+const MiniChart = memo(function MiniChart({ title, prefix, rows, devices, stacked = true }: { title: string; prefix: "s" | "p"; rows: Row[]; devices: { serial: string; name: string; color: string }[]; stacked?: boolean }) {
   const fmt = useFormat();
   const bars = devices.map((d) => ({ key: `${prefix}:${d.serial}`, name: d.name, color: colorCss(d.color) }));
   return (
@@ -120,10 +117,10 @@ const MiniChart = memo(function MiniChart({ title, prefix, rows, devices }: { ti
               labelStyle={{ color: "var(--text-2)" }}
               itemStyle={{ color: "var(--text)" }}
               labelFormatter={(_l, payload) => String(payload?.[0]?.payload?.full ?? _l)}
-              formatter={(value, name) => [fmt.integer(Number(value)), String(name)]}
+              formatter={(value, name) => [prefix === "p" ? fmt.number(Number(value)) : fmt.integer(Number(value)), String(name)]}
             />
             {bars.map((b, i) => (
-              <Bar key={b.key} dataKey={b.key} name={b.name} stackId="a" fill={b.color} stroke="var(--surface)" strokeWidth={1} radius={i === bars.length - 1 ? [3, 3, 0, 0] : 0} isAnimationActive={false} />
+              <Bar key={b.key} dataKey={b.key} name={b.name} stackId={stacked ? "a" : undefined} fill={b.color} stroke="var(--surface)" strokeWidth={1} radius={!stacked || i === bars.length - 1 ? [3, 3, 0, 0] : 0} isAnimationActive={false} />
             ))}
           </BarChart>
         </ResponsiveContainer>

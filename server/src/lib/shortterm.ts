@@ -21,6 +21,16 @@ export interface ShortTermStats {
     week: { sessions: number; puffs: number; days: number };
     lastWeek: { sessions: number; puffs: number };
     avg7: { sessions: number; puffs: number };
+    /** Derived averages: sticks per day and puffs per stick. */
+    derived: {
+      weekSticksPerDay: number;
+      lastWeekSticksPerDay: number;
+      todayPuffsPerStick: number | null;
+      yesterdayPuffsPerStick: number | null;
+      weekPuffsPerStick: number | null;
+      lastWeekPuffsPerStick: number | null;
+      avg7PuffsPerStick: number | null;
+    };
   };
   perSerial: Record<string, { today: { sessions: number; puffs: number }; week: { sessions: number; puffs: number } }>;
 }
@@ -44,6 +54,7 @@ export function shortTermStats(serials: string[], tz: string = DISPLAY_TZ): Shor
       week: { sessions: 0, puffs: 0, days: 0 },
       lastWeek: { sessions: 0, puffs: 0 },
       avg7: { sessions: 0, puffs: 0 },
+      derived: { weekSticksPerDay: 0, lastWeekSticksPerDay: 0, todayPuffsPerStick: null, yesterdayPuffsPerStick: null, weekPuffsPerStick: null, lastWeekPuffsPerStick: null, avg7PuffsPerStick: null },
     },
     perSerial: {},
   });
@@ -114,5 +125,16 @@ export function shortTermStats(serials: string[], tz: string = DISPLAY_TZ): Shor
   result.totals.week.days = weekDays;
   const sum7 = result.days.reduce((a, d) => ({ sessions: a.sessions + d.sessions, puffs: a.puffs + d.puffs }), { sessions: 0, puffs: 0 });
   result.totals.avg7 = { sessions: Math.round((sum7.sessions / 7) * 10) / 10, puffs: Math.round(sum7.puffs / 7) };
+  const perStick = (puffs: number, sessions: number) => (sessions ? Math.round((puffs / sessions) * 10) / 10 : null);
+  const t = result.totals;
+  t.derived = {
+    weekSticksPerDay: Math.round((t.week.sessions / Math.max(1, weekDays)) * 10) / 10,
+    lastWeekSticksPerDay: Math.round((t.lastWeek.sessions / 7) * 10) / 10,
+    todayPuffsPerStick: perStick(t.today.puffs, t.today.sessions),
+    yesterdayPuffsPerStick: perStick(t.yesterday.puffs, t.yesterday.sessions),
+    weekPuffsPerStick: perStick(t.week.puffs, t.week.sessions),
+    lastWeekPuffsPerStick: perStick(t.lastWeek.puffs, t.lastWeek.sessions),
+    avg7PuffsPerStick: perStick(sum7.puffs, sum7.sessions),
+  };
   return result;
 }

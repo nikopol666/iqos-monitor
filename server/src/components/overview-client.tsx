@@ -9,7 +9,7 @@ import { Badge, Empty } from "@/components/ui";
 import { DeviceImage } from "@/components/device-image";
 import { colorCss } from "@/lib/palette";
 
-export function OverviewClient({ initial }: { initial: DeviceOverview[] }) {
+export function OverviewClient({ initial, middle }: { initial: DeviceOverview[]; middle?: React.ReactNode }) {
   const { t } = useI18n();
   const [devices, setDevices] = useState(initial);
   const [stale, setStale] = useState(false);
@@ -42,15 +42,29 @@ export function OverviewClient({ initial }: { initial: DeviceOverview[] }) {
   }, [initial]);
 
   if (!devices.length) return <Empty>{t.overview.empty}</Empty>;
+  const connected = devices.filter((d) => d.connected);
 
   return (
-    <div className={`space-y-4 transition-opacity ${stale ? "opacity-60" : ""}`}>
-      <h1 className="text-xl font-semibold">{t.overview.title}</h1>
-      <div className="grid gap-4 md:grid-cols-2">
-        {devices.map((d) => (
-          <DeviceCard key={d.serial} d={d} />
-        ))}
-      </div>
+    <div className={`space-y-6 transition-opacity ${stale ? "opacity-60" : ""}`}>
+      {connected.length ? (
+        <section className="space-y-3">
+          <h1 className="text-xl font-semibold">{t.overview.connectedNow}</h1>
+          <div className="grid gap-4 md:grid-cols-2">
+            {connected.map((d) => (
+              <DeviceCard key={d.serial} d={d} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+      {middle}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">{t.overview.allDevices}</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          {devices.map((d) => (
+            <DeviceCard key={d.serial} d={d} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
