@@ -51,7 +51,7 @@ assert METADATA_REQUEST.hex()=='c01002010175d6'
 
 # Import existing experimental JSON captures into fresh SQLite, with no USB.
 from tempfile import TemporaryDirectory
-with TemporaryDirectory() as temp:
+with TemporaryDirectory(ignore_cleanup_errors=True) as temp:
     db=connect(Path(temp)/'test.sqlite3')
     files=[ROOT/'modra_correct_20261026_203051.json',ROOT/'fialova_history_sample_20261026_195811.json']
     stats=import_json_files(db,files)

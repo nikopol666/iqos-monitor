@@ -24,7 +24,7 @@ class Fake:
     def close(self): pass
 
 # Test fully unbounded first sync even with holes and existing imported JSON.
-with tempfile.TemporaryDirectory() as d:
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
     db=connect(Path(d)/'db.sqlite3')
     save_device(db,SERIAL,10)  # v0.1 metadata value, but no completion flag.
     save_event(db,SERIAL,8,'ok',b'abc')
@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory() as d:
     db.close()
 
 # Test test limit then full resume without restarting from scratch.
-with tempfile.TemporaryDirectory() as d:
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
     db=connect(Path(d)/'db.sqlite3')
     Fake.observed.clear(); Fake.count=10; Fake.stop_at=None
     assert sync_one(db,info,full=True,desired=2,delay=0.0,device_factory=Fake)
@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory() as d:
     db.close()
 
 # Test physical disconnection partway through initial sync.
-with tempfile.TemporaryDirectory() as d:
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
     db=connect(Path(d)/'db.sqlite3')
     Fake.observed.clear(); Fake.count=10; Fake.stop_at=5
     try: sync_one(db,info,full=True,desired=None,delay=0.0,device_factory=Fake)
@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory() as d:
     db.close()
 
 # Test failure on a new incremental index does not advance highwater.
-with tempfile.TemporaryDirectory() as d:
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
     db=connect(Path(d)/'db.sqlite3')
     Fake.count=3; Fake.observed.clear()
     assert sync_one(db,info,full=True,desired=None,delay=0.0,device_factory=Fake)
@@ -87,7 +87,7 @@ with tempfile.TemporaryDirectory() as d:
     db.close()
 
 # Test migration of v0.1 schema.
-with tempfile.TemporaryDirectory() as d:
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
     path=Path(d)/'db.sqlite3'
     db=sqlite3.connect(path); db.execute('CREATE TABLE devices (serial TEXT PRIMARY KEY,display_name TEXT NOT NULL,last_seen_utc TEXT,next_index INTEGER)'); db.commit();db.close()
     db=connect(path)

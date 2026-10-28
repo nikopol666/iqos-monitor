@@ -38,40 +38,42 @@ class Fake:
     def close(self):pass
 
 info={'serial_number':'DEVICEA0000001'}
-with tempfile.TemporaryDirectory() as d:
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
     folder=Path(d)
     db=connect(folder/'test.sqlite3')
     Fake.seen=[]
-    assert sync_recent(db,info,delay=0.0,device_factory=Fake,cutoff_override=CUT)
-    assert Fake.seen[0]==329 and Fake.seen[-1]==204, (Fake.seen[0],Fake.seen[-1])
-    recent_next,mo,floor,warning=recent_state(db,info['serial_number'])
-    assert (recent_next,mo,floor,warning)==(330,3,204,1)
-    assert get_status(db,info['serial_number'],203) is None
-    Fake.count=331;Fake.seen=[]
-    assert sync_recent(db,info,delay=0.0,device_factory=Fake,cutoff_override=CUT)
-    assert Fake.seen==[330],Fake.seen
-    assert recent_state(db,info['serial_number'])[0]==331
-    # Manual full must fill older IDs while preserving the recent-sync checkpoint.
-    Fake.seen=[]
-    assert sync_full(db,info,delay=0.0,device_factory=Fake)
-    assert Fake.seen[0]==203 and Fake.seen[-1]==0
-    assert get_status(db,info['serial_number'],0)=='ok'
-    assert recent_state(db,info['serial_number'])[0]==331
-    # Import the user's two measured ending alerts/counter differences.
-    assert import_observations(db,Path(__file__).resolve().parents[1] / 'iqos_agent' / 'known_observations.json')==2
-    # Seed measured event (we haven't fetched 1076 in the small fake archive).
-    save_event(db,info['serial_number'],1076,'ok',frame(1076,dt.datetime(2026,10,26,19,2,tzinfo=dt.timezone.utc)))
-    output=build(db,folder/'viewer.html').read_text(encoding='utf-8')
-    assert 'Upozornění na konec' in output and 'Potáhnutí' in output
-    assert '2026-10-26T19:06:16+00:00' in output
-    assert 'Zobrazit kompletní uložený archiv' in output
-    export=export_csv(db,folder/'export.csv').read_text(encoding='utf-8-sig')
-    assert 'puffs_estimate_from_counter_delta' in export
-    assert ';18;' in export
-    db.close()
+    try:
+      assert sync_recent(db,info,delay=0.0,device_factory=Fake,cutoff_override=CUT)
+      assert Fake.seen[0]==329 and Fake.seen[-1]==204, (Fake.seen[0],Fake.seen[-1])
+      recent_next,mo,floor,warning=recent_state(db,info['serial_number'])
+      assert (recent_next,mo,floor,warning)==(330,3,204,1)
+      assert get_status(db,info['serial_number'],203) is None
+      Fake.count=331;Fake.seen=[]
+      assert sync_recent(db,info,delay=0.0,device_factory=Fake,cutoff_override=CUT)
+      assert Fake.seen==[330],Fake.seen
+      assert recent_state(db,info['serial_number'])[0]==331
+      # Manual full must fill older IDs while preserving the recent-sync checkpoint.
+      Fake.seen=[]
+      assert sync_full(db,info,delay=0.0,device_factory=Fake)
+      assert Fake.seen[0]==203 and Fake.seen[-1]==0
+      assert get_status(db,info['serial_number'],0)=='ok'
+      assert recent_state(db,info['serial_number'])[0]==331
+      # Import the user's two measured ending alerts/counter differences.
+      assert import_observations(db,Path(__file__).resolve().parents[1] / 'iqos_agent' / 'known_observations.json')==2
+      # Seed measured event (we haven't fetched 1076 in the small fake archive).
+      save_event(db,info['serial_number'],1076,'ok',frame(1076,dt.datetime(2026,10,26,19,2,tzinfo=dt.timezone.utc)))
+      output=build(db,folder/'viewer.html').read_text(encoding='utf-8')
+      assert 'Upozornění na konec' in output and 'Potáhnutí' in output
+      assert '2026-10-26T19:06:16+00:00' in output
+      assert 'Zobrazit kompletní uložený archiv' in output
+      export=export_csv(db,folder/'export.csv').read_text(encoding='utf-8-sig')
+      assert 'puffs_estimate_from_counter_delta' in export
+      assert ';18;' in export
+    finally:
+      db.close()
 
 # User can interrupt and resume an incomplete window with no hidden progress.
-with tempfile.TemporaryDirectory() as d:
+with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
     db=connect(Path(d)/'db.sqlite3');Fake.count=330;Fake.seen=[]
     assert sync_recent(db,info,desired=10,delay=0.0,device_factory=Fake,cutoff_override=CUT)
     assert recent_state(db,info['serial_number'])[0] is None
