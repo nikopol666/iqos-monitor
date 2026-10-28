@@ -18,6 +18,7 @@ const WRITABLE: Record<string, string[]> = {
   vib_ready: ["on", "off"],
   vib_almost: ["on", "off"],
   vib_end: ["on", "off"],
+  restart: ["now"],
 };
 
 export interface SettingsView {
@@ -25,6 +26,7 @@ export interface SettingsView {
   readAtUtc: string | null;
   values: Record<"flexpuff" | "brightness" | "autostart" | "smart_gesture" | "pause_mode" | "lock" | "vib_heat" | "vib_ready" | "vib_almost" | "vib_end", string | null>;
   statuses: Record<string, string>;
+  eventLog: { index: number; time_utc: string | null; type: number; data: string }[];
   jobs: { id: number; setting: string; value: string; status: string; message: string | null; updatedUtc: string }[];
 }
 
@@ -64,6 +66,7 @@ export function settingsView(serial: string): SettingsView {
       vib_end: onOff(values.vib_end_enabled),
     },
     statuses,
+    eventLog: Array.isArray(values.event_log) ? (values.event_log as { index: number; time_utc: string | null; type: number; data: string }[]) : [],
     jobs,
   };
 }

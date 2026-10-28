@@ -45,7 +45,8 @@ for color,stamp,stick,puffs in [('fialova','201331',1077,14736),('modra','201341
     assert snap['statuses']['brightness']=='unsupported'
     assert snap['statuses']['vibration']=='unsupported'
     assert snap['statuses']['flexbattery']=='unsupported'
-    assert len(fake.device.writes)==len(READ_COMMANDS)
+    from iqos_agent.device_info import EVENT_LOG_ENTRIES
+    assert len(fake.device.writes)==len(READ_COMMANDS)+EVENT_LOG_ENTRIES   # registers + event log reads
     assert all(p[0]==0x3f for p in fake.device.writes)
     print(color,'snapshot ok:',v['lifetime_sticks_candidate'],v['lifetime_puffs_candidate'])
 print('SNAPSHOT READ-ONLY CAPTURE TESTS PASSED')

@@ -81,6 +81,8 @@ SETTINGS: dict[str, SettingSpec] = {
     "lock": SettingSpec("lock", {"on": ["c0440402ff00005a"], "off": ["c04404000000005d"]}, "c000041c", _flag(0, None, on=0x02, off=0x00)),
     # Find my IQOS: momentary vibration burst; no read-back exists.
     "find": SettingSpec("find", {"on": ["c04562011e00000b"], "off": ["c04562001e00001d"]}, None),
+    # Device restart as the official app does it (two frames); the device drops off USB and re-enumerates.
+    "restart": SettingSpec("restart", {"now": ["c946000000000080", "c046000000000080"]}, None),
 }
 for _key, _row in VIB_ROWS.items():
     SETTINGS[_key] = SettingSpec(_key, {"off": [_row["off"]], "on": [_row["on"]]}, _row["read"], decode_vib_row, group="vibration")

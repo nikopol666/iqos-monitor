@@ -100,6 +100,31 @@ def u32(b,at):
     return int.from_bytes(b[at:at+4],'little') if len(b)>=at+4 else None
 
 
+EVENT_LOG_ENTRIES = 40
+
+
+def event_log_command(index: int) -> bytes:
+    body = bytes([0xC9, 0x05, 0x02, index, 0x00, 0x00, 0x00])
+    return body + bytes([crc8(body[1:])])
+
+
+def read_event_log(dev, count: int = EVENT_LOG_ENTRIES) -> list:
+    """Undecoded device event log the official app reads (c9 05 02 <index>); read-only."""
+    import time as _time
+    entries = []
+    for index in range(count):
+        status, payload, frame = read_classic(dev, event_log_command(index), timeout=1.2)
+        if status != 'ok' or len(payload) < 12:
+            entries.append({'index': index, 'status': status})
+            continue
+        ts = int.from_bytes(payload[2:6], 'little')
+        entries.append({'index': index, 'status': 'ok', 'raw': payload.hex(),
+                        'time_utc': (dt.datetime(2010, 1, 1, tzinfo=dt.timezone.utc) + dt.timedelta(seconds=ts)).isoformat() if ts else None,
+                        'type': payload[6], 'data': payload[7:].hex()})
+        _time.sleep(0.02)
+    return entries
+
+
 def read_snapshot(dev):
     """Return JSON-friendly snapshot with validated and tentative fields separated."""
     frames={}; values={}; statuses={}; payloads={}
@@ -166,5 +191,9 @@ def read_snapshot(dev):
     values['holder_firmware_raw']=payloads.get('holder_firmware',b'').hex() or None
     values['epoch_raw']=payloads.get('epoch',b'').hex() or None
     values['conversion_raw']=payloads.get('conversion',b'').hex() or None
+    try:
+        values['event_log']=[e for e in read_event_log(dev) if e.get('time_utc')]
+    except Exception as exc:  # the log is research data; never block the snapshot
+        values['event_log_error']=str(exc)
     return {'values':values,'statuses':statuses,'frames':frames,
             'collected_utc':dt.datetime.now(dt.timezone.utc).isoformat()}

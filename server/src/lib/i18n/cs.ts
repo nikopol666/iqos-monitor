@@ -169,6 +169,10 @@ export const cs: Dictionary = {
     vibReady: "Připraveno k použití",
     vibAlmost: "Skoro hotovo",
     vibEnd: "Zážitek ukončen",
+    restart: "Restartovat zařízení",
+    restartConfirm: "Restartovat zařízení? Na pár sekund se odpojí, nastavení zůstane.",
+    eventLog: "Log událostí zařízení (nedekódováno)",
+    eventLogHint: "Záznamy, které z zařízení čte oficiální aplikace. Význam typů zatím neznáme; nejnovější nahoře.",
     invalidCount: "{n} skryto",
   },
   settings: {

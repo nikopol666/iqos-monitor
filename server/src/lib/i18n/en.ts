@@ -167,6 +167,10 @@ export const en = {
     vibReady: "Ready to use",
     vibAlmost: "Almost done",
     vibEnd: "Experience ended",
+    restart: "Restart device",
+    restartConfirm: "Restart the device now? It disconnects for a few seconds; settings are kept.",
+    eventLog: "Device event log (not decoded)",
+    eventLogHint: "Entries the official app reads from the device. Meaning of the types is unknown; newest first.",
     invalidCount: "{n} hidden",
   },
   settings: {

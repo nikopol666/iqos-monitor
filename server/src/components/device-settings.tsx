@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, RotateCcw } from "lucide-react";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import type { SettingsView } from "@/app/api/devices/[serial]/settings/route";
 import { Card, CardTitle, Notice } from "@/components/ui";
 
-type SettingKey = "flexpuff" | "brightness" | "autostart" | "smart_gesture" | "lock" | "find" | "vib_heat" | "vib_ready" | "vib_almost" | "vib_end";
+type SettingKey = "flexpuff" | "brightness" | "autostart" | "smart_gesture" | "lock" | "find" | "vib_heat" | "vib_ready" | "vib_almost" | "vib_end" | "restart";
 
 /** Toggle controls for the settings the agent can write; polls while a change is pending. */
 export function DeviceSettings({ serial, connected, initial }: { serial: string; connected: boolean; initial: SettingsView }) {
@@ -97,6 +97,30 @@ export function DeviceSettings({ serial, connected, initial }: { serial: string;
         {renderRow({ label: t.device.vibAlmost, setting: "vib_almost", current: view.values.vib_almost, options: [{ value: "off", label: t.device.off }, { value: "on", label: t.device.on }] })}
         {renderRow({ label: t.device.vibEnd, setting: "vib_end", current: view.values.vib_end, options: [{ value: "off", label: t.device.off }, { value: "on", label: t.device.on }] })}
       </div>
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3 text-sm">
+        <span>{t.device.restart}</span>
+        <button type="button" className="ui-btn h-8 text-xs" disabled={disabled || !!pending.length} onClick={() => confirm(t.device.restartConfirm) && change("restart", "now")}>
+          <RotateCcw size={14} aria-hidden /> {t.device.restart}
+        </button>
+      </div>
+      {view.eventLog.length ? (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs text-text-2">{t.device.eventLog} · {view.eventLog.length}</summary>
+          <p className="mt-1 text-xs text-muted">{t.device.eventLogHint}</p>
+          <table className="mt-2 w-full text-xs">
+            <tbody className="tabular">
+              {view.eventLog.map((e) => (
+                <tr key={e.index} className="border-t border-border">
+                  <td className="py-1 pr-3 font-mono text-muted">{e.index}</td>
+                  <td className="py-1 pr-3 whitespace-nowrap">{fmt.dateTimeSec(e.time_utc)}</td>
+                  <td className="py-1 pr-3 font-mono">{e.type.toString(16).padStart(2, "0")}</td>
+                  <td className="py-1 font-mono text-muted">{e.data}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      ) : null}
       {pending.length ? (
         <p className="mt-2 text-xs text-accent">{t.device.applying}</p>
       ) : lastResult ? (
