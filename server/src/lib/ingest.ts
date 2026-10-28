@@ -275,20 +275,23 @@ export function isLiveConnected(state: schema.LiveState | undefined | null, now 
   return now - Date.parse(state.updatedUtc) < LIVE_TIMEOUT_SECONDS * 1000;
 }
 
-export type JobType = "full_history";
+export type JobType = "full_history" | "set_setting";
 
+/** Queue a job; an identical open job (same type and payload) is returned instead of duplicated. */
 export function createJob(serial: string, type: JobType, payload?: unknown): schema.AgentJob {
   const db = getDb();
   const now = nowUtc();
+  const payloadJson = payload == null ? null : JSON.stringify(payload);
   const open = db
     .select()
     .from(schema.agentJobs)
     .where(and(eq(schema.agentJobs.serial, serial), eq(schema.agentJobs.type, type), inArray(schema.agentJobs.status, ["queued", "running"])))
-    .get();
+    .all()
+    .find((j) => j.payloadJson === payloadJson);
   if (open) return open;
   return db
     .insert(schema.agentJobs)
-    .values({ serial, type, payloadJson: payload == null ? null : JSON.stringify(payload), status: "queued", createdUtc: now, updatedUtc: now })
+    .values({ serial, type, payloadJson, status: "queued", createdUtc: now, updatedUtc: now })
     .returning()
     .get();
 }

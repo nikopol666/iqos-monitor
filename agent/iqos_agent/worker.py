@@ -8,6 +8,7 @@ enumerates USB every 2 s, keeps a heartbeat with the server, and hands jobs
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
 import threading
 import time
@@ -20,6 +21,7 @@ from iqos_agent.device_info import read_snapshot
 from iqos_agent.full import sync_full
 from iqos_agent.live import read_live
 from iqos_agent.recent import sync_recent
+from iqos_agent.settings import SettingError, apply_setting
 from iqos_agent.storage import (connect, import_observations, pending_upload_count,
                                 save_device, save_snapshot)
 from iqos_agent.uploader import ServerClient, ServerError, flush_pending, flush_snapshot
@@ -94,6 +96,7 @@ class DeviceWorker(threading.Thread):
         self._last_upload = 0.0
         self._live_failures = 0
         self._next_index: Optional[int] = None
+        self._model: Optional[str] = None
 
     # -- jobs handed over by the manager ------------------------------------------------
     def offer_jobs(self, jobs: list[dict]) -> None:
@@ -102,7 +105,7 @@ class DeviceWorker(threading.Thread):
             for job in jobs:
                 if job["status"] == "cancelled":
                     self.cancelled_jobs.add(job["id"])
-                elif job["id"] not in known and job["type"] == "full_history":
+                elif job["id"] not in known and job["type"] in ("full_history", "set_setting"):
                     self.jobs.append(job)
 
     def _pop_job(self) -> Optional[dict]:
@@ -140,7 +143,10 @@ class DeviceWorker(threading.Thread):
             while not self.stop_event.is_set():
                 job = self._pop_job()
                 if job is not None:
-                    self._run_full_history(db, dev, job)
+                    if job["type"] == "set_setting":
+                        self._run_set_setting(db, dev, job)
+                    else:
+                        self._run_full_history(db, dev, job)
                     continue
                 self._live_tick(dev)
                 self._maybe_upload(db)
@@ -167,6 +173,7 @@ class DeviceWorker(threading.Thread):
         try:
             snap = read_snapshot(dev)
             save_snapshot(db, self.serial, snap)
+            self._model = snap["values"].get("model")
             self._set(battery=snap["values"].get("battery_percent"))
             if self.client:
                 flush_snapshot(self.client, db, self.serial)
@@ -233,6 +240,37 @@ class DeviceWorker(threading.Thread):
         except ServerError as exc:
             log.warning("upload failed: %s", exc)
             self.status.update(lambda s: (setattr(s, "server_ok", False), setattr(s, "server_error", str(exc))))
+
+    def _run_set_setting(self, db, dev, job: dict) -> None:
+        job_id = job["id"]
+        payload = job.get("payload") or {}
+        setting = str(payload.get("setting", ""))
+        value = str(payload.get("value", ""))
+        log.info("%s set %s=%s (job %s)", self.serial, setting, value, job_id)
+        if self.client:
+            try:
+                self.client.post_job(job_id, status="running")
+            except ServerError:
+                pass
+        if job_id in self.cancelled_jobs:
+            return
+        try:
+            result = apply_setting(dev, self._model, setting, value)
+            final, message = "done", json.dumps({"setting": setting, "value": result})
+            log.info("%s %s now %s", self.serial, setting, result)
+        except SettingError as exc:
+            final, message = "failed", str(exc)
+            log.warning("%s set %s failed: %s", self.serial, setting, exc)
+        except Exception as exc:
+            final, message = "failed", f"{type(exc).__name__}: {exc}"
+            log.warning("%s set %s crashed: %s", self.serial, setting, exc)
+        # Fresh diagnostics so the web shows the new state.
+        self._snapshot(db, dev)
+        if self.client:
+            try:
+                self.client.post_job(job_id, status=final, message=message)
+            except ServerError:
+                pass
 
     def _run_full_history(self, db, dev, job: dict) -> None:
         job_id = job["id"]

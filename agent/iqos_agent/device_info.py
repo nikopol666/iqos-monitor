@@ -26,9 +26,10 @@ READ_COMMANDS = {
     'flexbattery': 'c90025fb',
     # Read-only probes taken from hauntedfail/iqos (BLE) – same SCP frames over USB.
     # On ILUMA i ONE over USB only flexpuff answers; the rest return an error bit.
-    'flexpuff': 'd205220300000017',
-    'autostart': 'c907240100000022',
-    'pause_mode': 'c907240200000018',
+    'flexpuff': 'c905220300000017',   # as the official app reads it (D2 05 22 03 works too)
+    'autostart': 'c007240100000022',  # ILUMA i ONE answers on C0, not C9
+    'pause_mode': 'c007240200000018',
+    'smart_gesture': 'c905220400000075',
     'holder_firmware': 'c9000000',
     'epoch': 'c003003f',
     'conversion': 'c00020e0',
@@ -144,6 +145,8 @@ def read_snapshot(dev):
     values['autostart_enabled']=(au[1]==1) if len(au)>=2 and au[0]==0x01 else None
     pm=payloads.get('pause_mode',b'')
     values['pause_mode_enabled']=(pm[1]==1) if len(pm)>=2 and pm[0]==0x02 else None
+    sg=payloads.get('smart_gesture',b'')
+    values['smart_gesture_enabled']=(sg[1]==1) if len(sg)>=2 and sg[0]==0x04 else None
     values['holder_firmware_raw']=payloads.get('holder_firmware',b'').hex() or None
     values['epoch_raw']=payloads.get('epoch',b'').hex() or None
     values['conversion_raw']=payloads.get('conversion',b'').hex() or None

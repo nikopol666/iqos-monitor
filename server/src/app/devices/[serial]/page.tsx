@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { deviceOverview, eventPage, getDevice, latestSnapshot, recentLiveSamples } from "@/lib/queries";
 import { DeviceClient } from "@/components/device-client";
+import { settingsView } from "@/app/api/devices/[serial]/settings/route";
 
 export default async function DevicePage({ params }: PageProps<"/devices/[serial]">) {
   const { serial } = await params;
@@ -22,6 +23,7 @@ export default async function DevicePage({ params }: PageProps<"/devices/[serial
       firstPage={eventPage(serial, 0, 100, undefined, true)}
       totalAll={eventPage(serial, 0, 1).total}
       samples={recentLiveSamples(serial, 40)}
+      settings={settingsView(serial)}
     />
   );
 }

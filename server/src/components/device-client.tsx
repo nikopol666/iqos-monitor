@@ -7,6 +7,8 @@ import type { LiveSample } from "@/db/schema";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import { Badge, Card, CardTitle, Notice } from "@/components/ui";
 import { DeviceImage } from "@/components/device-image";
+import { DeviceSettings } from "@/components/device-settings";
+import type { SettingsView } from "@/app/api/devices/[serial]/settings/route";
 
 interface SnapshotView {
   collectedUtc: string;
@@ -14,7 +16,7 @@ interface SnapshotView {
   statuses: Record<string, string>;
 }
 
-export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples }: { initial: DeviceOverview; snapshot: SnapshotView | null; firstPage: EventPage; totalAll: number; samples: LiveSample[] }) {
+export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, settings }: { initial: DeviceOverview; snapshot: SnapshotView | null; firstPage: EventPage; totalAll: number; samples: LiveSample[]; settings: SettingsView }) {
   const { t, f } = useI18n();
   const fmt = useFormat();
   const [d, setD] = useState(initial);
@@ -177,6 +179,8 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples }
           </div>
         </Card>
       </div>
+
+      <DeviceSettings serial={d.serial} connected={d.connected} initial={settings} />
 
       <Card>
         <CardTitle
