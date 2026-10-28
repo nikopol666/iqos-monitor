@@ -61,7 +61,7 @@ py -3 -m iqos_agent --console  # debug mode, logs to stdout
 
 **Windows 11 Smart App Control** blocks unsigned executables such as the
 PyInstaller build. On such machines run the agent from source instead:
-double-click `agentun_agent.vbs` (starts the signed `pythonw.exe` without a
+double-click `agent\run_agent.vbs` (starts the signed `pythonw.exe` without a
 console; requires Python 3 and `pip install -r requirements.txt`). The
 "Start with Windows" switch in the tray menu registers that launcher.
 
