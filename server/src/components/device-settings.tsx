@@ -21,7 +21,10 @@ export function DeviceSettings({ serial, connected, initial }: { serial: string;
   const refresh = useCallback(async () => {
     try {
       const res = await fetch(`/api/devices/${serial}/settings`, { cache: "no-store" });
-      if (res.ok) setView((await res.json()) as SettingsView);
+      if (res.ok) {
+        const next = (await res.json()) as SettingsView;
+        setView((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+      }
     } catch {
       /* keep last */
     }

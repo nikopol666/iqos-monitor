@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, ChevronUp, SlidersHorizontal } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useFormat, useI18n } from "@/lib/i18n/client";
@@ -35,9 +35,8 @@ function useElementWidth(ref: React.RefObject<HTMLDivElement | null>): number {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const update = () => setWidth(el.clientWidth);
-    update();
-    const ro = new ResizeObserver(update);
+    // ResizeObserver reports the initial size on observe(), so no synchronous setState here.
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
     ro.observe(el);
     return () => ro.disconnect();
   }, [ref]);
@@ -77,6 +76,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
 
   const load = useCallback(async () => {
     setLoading(true);
+    setDrill(null);
     const params = scopeParams();
     params.set("from", from);
     params.set("to", to);
@@ -94,8 +94,9 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
   }, [from, to, group, scopeParams]);
 
   useEffect(() => {
-    setDrill(null);
-    void load();
+    // Deferred so the fetch (and its loading state) starts after the render commits.
+    const id = setTimeout(() => void load(), 0);
+    return () => clearTimeout(id);
   }, [load]);
 
   const presets: { key: string; label: string; days: number | null }[] = [
@@ -186,7 +187,6 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
   }
 
   const deviceBySerial = useMemo(() => new Map(devices.map((d) => [d.serial, d])), [devices]);
-  const chartRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="space-y-4">
@@ -312,11 +312,11 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
               <>
                 <Card>
                   <CardTitle>{f(t.stats.chartSticks, { unit: unitLabel.toLowerCase() })}</CardTitle>
-                  <Chart rows={chartRows} metric="sessions" />
+                  <BucketChart rows={chartRows} bars={series.map((d) => ({ key: `sessions:${d.serial}`, name: d.name, color: colorCss(d.color) }))} onBar={(i) => data.buckets[i] && void openBucket(data.buckets[i])} />
                 </Card>
                 <Card>
                   <CardTitle>{f(t.stats.chartPuffs, { unit: unitLabel.toLowerCase() })}</CardTitle>
-                  <Chart rows={chartRows} metric="puffs" />
+                  <BucketChart rows={chartRows} bars={series.map((d) => ({ key: `puffs:${d.serial}`, name: d.name, color: colorCss(d.color) }))} onBar={(i) => data.buckets[i] && void openBucket(data.buckets[i])} />
                 </Card>
 
                 {drill ? (
@@ -414,42 +414,51 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
       </div>
     </div>
   );
-
-  function Chart({ rows, metric }: { rows: Record<string, number | string>[]; metric: "sessions" | "puffs" }) {
-    const bars = series.length ? series.map((d) => ({ key: `${metric}:${d.serial}`, name: d.name, color: colorCss(d.color) })) : [];
-    const width = useElementWidth(chartRef);
-    const maxTicks = Math.max(3, Math.floor((width || 600) / 72));
-    const interval = rows.length > maxTicks ? Math.ceil(rows.length / maxTicks) - 1 : 0;
-    return (
-      <div ref={chartRef} className="h-52 w-full sm:h-64">
-        <ResponsiveContainer>
-          <BarChart
-            data={rows}
-            margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-            barCategoryGap="25%"
-            onClick={(state) => {
-              const idx = (state as { activeTooltipIndex?: number } | null)?.activeTooltipIndex;
-              if (typeof idx === "number" && data?.buckets[idx]) void openBucket(data.buckets[idx]);
-            }}
-            style={{ cursor: "pointer" }}
-          >
-            <CartesianGrid vertical={false} stroke="var(--grid)" />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--text-2)" }} tickLine={false} axisLine={{ stroke: "var(--border)" }} interval={interval} minTickGap={16} />
-            <YAxis tick={{ fontSize: 11, fill: "var(--text-2)" }} tickLine={false} axisLine={false} width={32} allowDecimals={false} />
-            <Tooltip
-              cursor={{ fill: "var(--surface-2)" }}
-              contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--text)" }}
-              labelStyle={{ color: "var(--text-2)" }}
-              itemStyle={{ color: "var(--text)" }}
-              labelFormatter={(_label, payload) => String(payload?.[0]?.payload?.full ?? _label)}
-              formatter={(value, name) => [fmt.integer(Number(value)), String(name)]}
-            />
-            {bars.map((s, i) => (
-              <Bar key={s.key} dataKey={s.key} name={s.name} stackId="a" fill={s.color} stroke="var(--surface)" strokeWidth={1} radius={i === bars.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  }
 }
+
+type ChartRow = Record<string, number | string>;
+interface SeriesDef {
+  key: string;
+  name: string;
+  color: string;
+}
+
+/** Stacked bars per device; measures its own width to pick the tick density. */
+const BucketChart = memo(function BucketChart({ rows, bars, onBar }: { rows: ChartRow[]; bars: SeriesDef[]; onBar: (index: number) => void }) {
+  const fmt = useFormat();
+  const ref = useRef<HTMLDivElement>(null);
+  const width = useElementWidth(ref);
+  const maxTicks = Math.max(3, Math.floor((width || 600) / 72));
+  const interval = rows.length > maxTicks ? Math.ceil(rows.length / maxTicks) - 1 : 0;
+  return (
+    <div ref={ref} className="h-52 w-full sm:h-64">
+      <ResponsiveContainer>
+        <BarChart
+          data={rows}
+          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+          barCategoryGap="25%"
+          onClick={(state) => {
+            const idx = (state as { activeTooltipIndex?: number } | null)?.activeTooltipIndex;
+            if (typeof idx === "number") onBar(idx);
+          }}
+          style={{ cursor: "pointer" }}
+        >
+          <CartesianGrid vertical={false} stroke="var(--grid)" />
+          <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--text-2)" }} tickLine={false} axisLine={{ stroke: "var(--border)" }} interval={interval} minTickGap={16} />
+          <YAxis tick={{ fontSize: 11, fill: "var(--text-2)" }} tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+          <Tooltip
+            cursor={{ fill: "var(--surface-2)" }}
+            contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--text)" }}
+            labelStyle={{ color: "var(--text-2)" }}
+            itemStyle={{ color: "var(--text)" }}
+            labelFormatter={(_label, payload) => String(payload?.[0]?.payload?.full ?? _label)}
+            formatter={(value, name) => [fmt.integer(Number(value)), String(name)]}
+          />
+          {bars.map((s, i) => (
+            <Bar key={s.key} dataKey={s.key} name={s.name} stackId="a" fill={s.color} stroke="var(--surface)" strokeWidth={1} radius={i === bars.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});

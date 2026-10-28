@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import type { ShortTermStats } from "@/lib/shortterm";
@@ -9,6 +9,7 @@ import { colorCss } from "@/lib/palette";
 import { Card, CardTitle, Stat } from "@/components/ui";
 
 type Payload = ShortTermStats & { devices: { serial: string; name: string; color: string }[] };
+type Row = Record<string, string | number>;
 
 function delta(now: number, before: number): string {
   if (!before) return "";
@@ -23,28 +24,37 @@ export function ShortTermClient({ initial }: { initial: Payload }) {
   const [data, setData] = useState(initial);
 
   useEffect(() => {
+    let last = JSON.stringify(initial);
     const id = setInterval(async () => {
       try {
         const res = await fetch("/api/shortterm", { cache: "no-store" });
-        if (res.ok) setData((await res.json()) as Payload);
+        if (!res.ok) return;
+        const next = (await res.json()) as Payload;
+        const json = JSON.stringify(next);
+        if (json !== last) {
+          last = json;
+          setData(next);
+        }
       } catch {
         /* keep last */
       }
     }, 60_000);
     return () => clearInterval(id);
-  }, []);
+  }, [initial]);
 
-  const rows = useMemo(
+  const shortDateKey = fmt.shortDateKey;
+  const dateKey = fmt.dateKey;
+  const rows = useMemo<Row[]>(
     () =>
       data.days.map((d) => {
-        const row: Record<string, string | number> = { day: d.day, label: fmt.shortDateKey(d.day), full: fmt.dateKey(d.day), sessions: d.sessions, puffs: d.puffs };
+        const row: Row = { day: d.day, label: shortDateKey(d.day), full: dateKey(d.day), sessions: d.sessions, puffs: d.puffs };
         for (const dev of data.devices) {
           row[`s:${dev.serial}`] = d.perSerial[dev.serial]?.sessions ?? 0;
           row[`p:${dev.serial}`] = d.perSerial[dev.serial]?.puffs ?? 0;
         }
         return row;
       }),
-    [data, fmt],
+    [data, shortDateKey, dateKey],
   );
   const multi = data.devices.length > 1;
   const tot = data.totals;
@@ -74,8 +84,8 @@ export function ShortTermClient({ initial }: { initial: Payload }) {
       <Card>
         <CardTitle right={<span className="text-xs text-muted">{f(t.short.avg7, { sticks: fmt.number(tot.avg7.sessions), puffs: fmt.integer(tot.avg7.puffs) })}</span>}>{t.short.last7}</CardTitle>
         <div className="grid gap-4 md:grid-cols-2">
-          <MiniChart title={t.stats.sticks} prefix="s" />
-          <MiniChart title={t.stats.puffs} prefix="p" />
+          <MiniChart title={t.stats.sticks} prefix="s" rows={rows} devices={data.devices} />
+          <MiniChart title={t.stats.puffs} prefix="p" rows={rows} devices={data.devices} />
         </div>
         {multi ? (
           <div className="mt-2 flex flex-wrap gap-3 text-xs text-text-2">
@@ -90,33 +100,34 @@ export function ShortTermClient({ initial }: { initial: Payload }) {
       </Card>
     </section>
   );
-
-  function MiniChart({ title, prefix }: { title: string; prefix: "s" | "p" }) {
-    const bars = data.devices.map((d) => ({ key: `${prefix}:${d.serial}`, name: d.name, color: colorCss(d.color) }));
-    return (
-      <div>
-        <div className="mb-1 text-xs font-medium text-text-2">{title}</div>
-        <div className="h-36 w-full">
-          <ResponsiveContainer>
-            <BarChart data={rows} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="30%">
-              <CartesianGrid vertical={false} stroke="var(--grid)" />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--text-2)" }} tickLine={false} axisLine={{ stroke: "var(--border)" }} />
-              <YAxis tick={{ fontSize: 10, fill: "var(--text-2)" }} tickLine={false} axisLine={false} width={28} allowDecimals={false} />
-              <Tooltip
-                cursor={{ fill: "var(--surface-2)" }}
-                contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--text)" }}
-                labelStyle={{ color: "var(--text-2)" }}
-                itemStyle={{ color: "var(--text)" }}
-                labelFormatter={(_l, payload) => String(payload?.[0]?.payload?.full ?? _l)}
-                formatter={(value, name) => [fmt.integer(Number(value)), String(name)]}
-              />
-              {bars.map((b, i) => (
-                <Bar key={b.key} dataKey={b.key} name={b.name} stackId="a" fill={b.color} stroke="var(--surface)" strokeWidth={1} radius={i === bars.length - 1 ? [3, 3, 0, 0] : 0} isAnimationActive={false} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    );
-  }
 }
+
+const MiniChart = memo(function MiniChart({ title, prefix, rows, devices }: { title: string; prefix: "s" | "p"; rows: Row[]; devices: { serial: string; name: string; color: string }[] }) {
+  const fmt = useFormat();
+  const bars = devices.map((d) => ({ key: `${prefix}:${d.serial}`, name: d.name, color: colorCss(d.color) }));
+  return (
+    <div>
+      <div className="mb-1 text-xs font-medium text-text-2">{title}</div>
+      <div className="h-36 w-full">
+        <ResponsiveContainer>
+          <BarChart data={rows} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="30%">
+            <CartesianGrid vertical={false} stroke="var(--grid)" />
+            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--text-2)" }} tickLine={false} axisLine={{ stroke: "var(--border)" }} />
+            <YAxis tick={{ fontSize: 10, fill: "var(--text-2)" }} tickLine={false} axisLine={false} width={28} allowDecimals={false} />
+            <Tooltip
+              cursor={{ fill: "var(--surface-2)" }}
+              contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--text)" }}
+              labelStyle={{ color: "var(--text-2)" }}
+              itemStyle={{ color: "var(--text)" }}
+              labelFormatter={(_l, payload) => String(payload?.[0]?.payload?.full ?? _l)}
+              formatter={(value, name) => [fmt.integer(Number(value)), String(name)]}
+            />
+            {bars.map((b, i) => (
+              <Bar key={b.key} dataKey={b.key} name={b.name} stackId="a" fill={b.color} stroke="var(--surface)" strokeWidth={1} radius={i === bars.length - 1 ? [3, 3, 0, 0] : 0} isAnimationActive={false} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+});

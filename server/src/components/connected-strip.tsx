@@ -20,7 +20,9 @@ export function ConnectedStrip() {
         const res = await fetch("/api/live", { cache: "no-store" });
         if (!res.ok) return;
         const data = (await res.json()) as { devices: DeviceOverview[] };
-        if (active) setDevices(data.devices.filter((d) => d.connected));
+        if (!active) return;
+        const next = data.devices.filter((d) => d.connected);
+        setDevices((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
       } catch {
         /* keep last */
       }

@@ -44,7 +44,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
         const res = await fetch("/api/live", { cache: "no-store" });
         const data = (await res.json()) as { devices: DeviceOverview[] };
         const mine = data.devices.find((x) => x.serial === initial.serial);
-        if (active && mine) setD(mine);
+        if (active && mine) setD((prev) => (JSON.stringify(prev) === JSON.stringify(mine) ? prev : mine));
       } catch {
         /* keep last state */
       }
