@@ -19,3 +19,4 @@ server/data/
 Thumbs.db
 # legacy standalone package stays as reference only
 IQOS-History/__pycache__/
+agent/dist_new/
