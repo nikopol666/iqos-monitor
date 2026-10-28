@@ -219,6 +219,8 @@ export interface IncomingLive {
   session_raw?: string | null;
   sync_status?: string | null;
   connected?: boolean;
+  brightness_level?: number | null;
+  status_60_raw?: string | null;
 }
 
 export function updateLive(serial: string, agentId: number | null, live: IncomingLive): void {
@@ -238,6 +240,7 @@ export function updateLive(serial: string, agentId: number | null, live: Incomin
     sessionRaw: live.session_raw ?? null,
     syncStatus: live.sync_status ?? null,
     disconnectedUtc: live.connected === false ? now : null,
+    extraJson: JSON.stringify({ brightness_level: live.brightness_level ?? null, status_60_raw: live.status_60_raw ?? null }),
   };
   if (live.connected === false) {
     // Keep the last known values, only mark the disconnect.
@@ -257,10 +260,11 @@ export function updateLive(serial: string, agentId: number | null, live: Incomin
     prev.battery !== next.battery ||
     prev.stickState !== next.stickState ||
     prev.lifetimeSticks !== next.lifetimeSticks ||
-    prev.lifetimePuffs !== next.lifetimePuffs;
+    prev.lifetimePuffs !== next.lifetimePuffs ||
+    prev.extraJson !== next.extraJson;
   if (changed) {
     db.insert(schema.liveSamples)
-      .values({ serial, atUtc: now, battery: next.battery, stickState: next.stickState, lifetimeSticks: next.lifetimeSticks, lifetimePuffs: next.lifetimePuffs })
+      .values({ serial, atUtc: now, battery: next.battery, stickState: next.stickState, lifetimeSticks: next.lifetimeSticks, lifetimePuffs: next.lifetimePuffs, extraJson: next.extraJson })
       .run();
   }
   db.update(schema.devices).set({ lastSeenUtc: now }).where(eq(schema.devices.serial, serial)).run();

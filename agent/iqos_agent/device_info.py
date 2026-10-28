@@ -32,6 +32,9 @@ READ_COMMANDS = {
     'holder_firmware': 'c9000000',
     'epoch': 'c003003f',
     'conversion': 'c00020e0',
+    # Candidates for the real battery register (official app reads these; values unverified).
+    'status_60': 'c0016032',
+    'status_long': 'c0010015',
 }
 
 
@@ -110,7 +113,13 @@ def read_snapshot(dev):
     values['serial_readback']=ascii_payload('serial')
     values['model']=ascii_payload('model')
     values['firmware_raw']=payloads.get('firmware',b'').hex() or None
+    # Register C0/00/24 follows the LED brightness (0x1E low / 0x64 high) in the
+    # official-app capture; it is kept under its old key for compatibility but
+    # must not be shown as battery.
     values['battery_percent']=u16(payloads.get('battery',b''),0)
+    values['brightness_level']=payloads['battery'][0] if payloads.get('battery') else None
+    values['status_60_raw']=payloads.get('status_60',b'').hex() or None
+    values['status_long_raw']=payloads.get('status_long',b'').hex() or None
     values['stick_state_code']=payloads.get('stick_state',b'')[:1].hex() or None
     values['error_state_code']=u16(payloads.get('error_state',b''),0)
     c=payloads.get('counters',b'')

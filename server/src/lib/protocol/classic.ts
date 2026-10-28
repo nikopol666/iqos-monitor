@@ -28,6 +28,9 @@ export const READ_COMMANDS = {
   holder_firmware: "c9000000",
   epoch: "c003003f",
   conversion: "c00020e0",
+  // Candidates for the real battery register (unverified).
+  status_60: "c0016032",
+  status_long: "c0010015",
 } as const;
 
 export type ClassicKey = keyof typeof READ_COMMANDS;
@@ -46,7 +49,11 @@ export interface SnapshotValues {
   serial_readback: string | null;
   model: string | null;
   firmware_raw: string | null;
+  /** Register C0/00/24: LED brightness level (0x1E low / 0x64 high), NOT battery. */
   battery_percent: number | null;
+  brightness_level: number | null;
+  status_60_raw: string | null;
+  status_long_raw: string | null;
   stick_state_code: string | null;
   error_state_code: number | null;
   lifetime_sticks_candidate: number | null;
@@ -100,6 +107,9 @@ export function parseSnapshotFrames(frames: Partial<Record<ClassicKey, string>>)
     model: payloads.model ? asciiPayload(payloads.model) : null,
     firmware_raw: hexOrNull("firmware"),
     battery_percent: payloads.battery ? u16le(payloads.battery, 0) : null,
+    brightness_level: payloads.battery && payloads.battery.length ? payloads.battery[0] : null,
+    status_60_raw: hexOrNull("status_60"),
+    status_long_raw: hexOrNull("status_long"),
     stick_state_code:
       payloads.stick_state && payloads.stick_state.length ? payloads.stick_state[0].toString(16).padStart(2, "0") : null,
     error_state_code: payloads.error_state ? u16le(payloads.error_state, 0) : null,

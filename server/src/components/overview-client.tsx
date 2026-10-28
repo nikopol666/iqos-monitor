@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BatteryMedium, Cable, CircleDot, Usb } from "lucide-react";
+import { Cable, CircleDot, Sun, Usb } from "lucide-react";
 import type { DeviceOverview } from "@/lib/queries";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import { Badge, Empty } from "@/components/ui";
@@ -59,8 +59,8 @@ export function OverviewClient({ initial }: { initial: DeviceOverview[] }) {
         style={{ borderTopColor: colorCss(d.color), borderTopWidth: 3 }}
       >
         <div className="flex gap-3 sm:gap-4">
-          <DeviceImage variant={d.variant} color={d.color} name={d.name} size={150} connected={d.connected} battery={d.lifetime.battery} className="hidden xs:flex sm:flex" />
-          <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} battery={d.lifetime.battery} className="sm:hidden" />
+          <DeviceImage variant={d.variant} color={d.color} name={d.name} size={150} connected={d.connected} className="hidden sm:flex" />
+          <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} className="sm:hidden" />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -92,8 +92,8 @@ export function OverviewClient({ initial }: { initial: DeviceOverview[] }) {
             <div className="mt-3 grid grid-cols-1 gap-2 text-sm min-[420px]:grid-cols-2">
               <Metric
                 label={t.overview.battery}
-                value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
-                icon={<BatteryMedium size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
+                value={d.lifetime.battery == null ? "—" : d.lifetime.battery === 100 ? t.overview.brightnessHigh : d.lifetime.battery === 30 ? t.overview.brightnessLow : `${d.lifetime.battery}`}
+                icon={<Sun size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
               />
               <Metric
                 label={d.connected ? (stickIn ? t.overview.stickInserted : t.overview.stickEmpty) : t.overview.today}

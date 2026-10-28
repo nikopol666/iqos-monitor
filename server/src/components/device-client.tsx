@@ -85,7 +85,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples }
     [t.device.model, v.model ?? d.model ?? "—"],
     [t.device.serial, <span key="s" className="font-mono">{d.serial}</span>],
     [t.device.firmware, <span key="f" className="font-mono text-xs">{v.firmware_raw ?? "—"}</span>],
-    [t.device.battery, d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`],
+    [t.device.battery, d.lifetime.battery == null ? "—" : d.lifetime.battery === 100 ? t.overview.brightnessHigh : d.lifetime.battery === 30 ? t.overview.brightnessLow : String(d.lifetime.battery)],
     [t.device.lifetimeSticks, fmt.integer(d.lifetime.sticks)],
     [t.device.lifetimePuffs, fmt.integer(d.lifetime.puffs)],
     [t.device.avgPuffs, d.lifetime.sticks && d.lifetime.puffs != null ? fmt.number(Math.round((d.lifetime.puffs / d.lifetime.sticks) * 100) / 100) : "—"],
@@ -111,7 +111,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples }
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} battery={d.lifetime.battery} />
+        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} />
         <h1 className="text-xl font-semibold">{d.name}</h1>
         {d.user ? (
           <span className="inline-flex items-center gap-1 text-sm text-text-2">

@@ -38,14 +38,12 @@ export function ConnectedStrip() {
     <div className="w-full overflow-x-auto [scrollbar-width:none]">
       <div className="mx-auto flex w-max max-w-full items-center gap-1.5">
       {devices.map((d) => {
-        const level = d.lifetime.battery;
-        const tone = level == null ? "var(--muted)" : level <= 15 ? "var(--critical)" : level <= 35 ? "var(--warning)" : "var(--good)";
         return (
           <Link
             key={d.serial}
             href={`/devices/${d.serial}`}
             className="anim-pop flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-surface-2 py-0.5 pl-1 pr-2.5 text-xs hover:border-accent"
-            title={`${d.name} · ${t.overview.connected}${level != null ? ` · ${level} %` : ""}`}
+            title={`${d.name} · ${t.overview.connected}`}
           >
             <span className="relative flex h-7 w-5 items-end justify-center">
               <span className="anim-breathe absolute inset-0 rounded-full blur-md" style={{ background: colorCss(d.color) }} aria-hidden />
@@ -53,11 +51,6 @@ export function ConnectedStrip() {
               <img src={variantImage(d.variant)} alt="" className="relative h-7 w-auto object-contain" draggable={false} />
             </span>
             <span className="hidden max-w-[8rem] truncate sm:inline lg:hidden xl:inline xl:max-w-[12rem]">{d.name}</span>
-            <span className="relative hidden h-1.5 w-8 overflow-hidden rounded-full bg-border sm:block lg:hidden xl:block" aria-hidden>
-              <span className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700" style={{ width: `${level ?? 0}%`, background: tone }} />
-              <span className="anim-sheen absolute inset-y-0 w-1/3" />
-            </span>
-            <span className="tabular">{level == null ? "—" : `${level} %`}</span>
             {d.sync ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-1.5 py-0.5 text-accent" title={d.sync.total ? f(t.overview.syncing, { done: d.sync.done, total: d.sync.total }) : t.overview.syncingShort}>
                 <ArrowDownUp size={12} className="anim-transfer" aria-hidden />

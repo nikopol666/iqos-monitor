@@ -75,6 +75,7 @@ export const liveState = sqliteTable("live_state", {
   /** Set by the agent when it closes the device or loses it. */
   disconnectedUtc: text("disconnected_utc"),
   syncStatus: text("sync_status"),
+  extraJson: text("extra_json"),
 });
 
 export const liveSamples = sqliteTable(
@@ -87,6 +88,7 @@ export const liveSamples = sqliteTable(
     stickState: text("stick_state"),
     lifetimeSticks: integer("lifetime_sticks"),
     lifetimePuffs: integer("lifetime_puffs"),
+    extraJson: text("extra_json"),
   },
   (t) => [index("live_samples_time").on(t.serial, t.atUtc)],
 );

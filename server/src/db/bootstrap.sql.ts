@@ -133,4 +133,9 @@ export const MIGRATIONS: string[] = [
   `
   UPDATE devices SET color = 'graphite' WHERE variant = 'iluma-i-one-midnight-black' AND color_custom = 0;
   `,
+  // v5 – raw candidate registers logged with live samples (battery register research)
+  `
+  ALTER TABLE live_state ADD COLUMN extra_json TEXT;
+  ALTER TABLE live_samples ADD COLUMN extra_json TEXT;
+  `,
 ];
