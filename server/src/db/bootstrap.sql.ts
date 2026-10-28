@@ -107,4 +107,12 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX IF NOT EXISTS agent_jobs_serial ON agent_jobs(serial, status);
   `,
+  // v2 – per-device colour and image variant
+  `
+  ALTER TABLE devices ADD COLUMN color TEXT NOT NULL DEFAULT '#2a78d6';
+  ALTER TABLE devices ADD COLUMN variant TEXT NOT NULL DEFAULT 'iluma-i-one-breeze-blue';
+  UPDATE devices SET color = CASE ((SELECT count(*) FROM devices d2 WHERE d2.rowid < devices.rowid) % 8)
+    WHEN 0 THEN '#2a78d6' WHEN 1 THEN '#eb6834' WHEN 2 THEN '#1baf7a' WHEN 3 THEN '#eda100'
+    WHEN 4 THEN '#e87ba4' WHEN 5 THEN '#008300' WHEN 6 THEN '#6250d6' ELSE '#e34948' END;
+  `,
 ];

@@ -7,6 +7,8 @@ import type { User } from "@/db/schema";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import { DICTIONARIES, SUPPORTED_LOCALES } from "@/lib/i18n";
 import { Card, CardTitle, Notice } from "@/components/ui";
+import { DeviceImage } from "@/components/device-image";
+import type { DeviceVariant } from "@/lib/variants";
 
 interface DeviceRow {
   serial: string;
@@ -14,6 +16,8 @@ interface DeviceRow {
   userId: number | null;
   model: string | null;
   lastSeenUtc: string | null;
+  color: string;
+  variant: string;
 }
 interface AgentRow {
   id: number;
@@ -30,7 +34,21 @@ async function call(url: string, method: string, body?: unknown) {
   return res.json();
 }
 
-export function SettingsClient({ users, devices, agents, envKeyConfigured, override }: { users: User[]; devices: DeviceRow[]; agents: AgentRow[]; envKeyConfigured: boolean; override: string | null }) {
+export function SettingsClient({
+  users,
+  devices,
+  variants,
+  agents,
+  envKeyConfigured,
+  override,
+}: {
+  users: User[];
+  devices: DeviceRow[];
+  variants: DeviceVariant[];
+  agents: AgentRow[];
+  envKeyConfigured: boolean;
+  override: string | null;
+}) {
   const { t } = useI18n();
   const fmt = useFormat();
   const router = useRouter();
@@ -106,33 +124,76 @@ export function SettingsClient({ users, devices, agents, envKeyConfigured, overr
         {devices.length === 0 ? <Notice tone="info">{t.overview.empty}</Notice> : null}
         <ul className="divide-y divide-border">
           {devices.map((d) => (
-            <li key={d.serial} className="grid items-center gap-2 py-2 sm:grid-cols-[1fr_1fr_1fr]">
-              <div>
-                <div className="font-mono text-xs text-muted">{d.serial}</div>
-                <div className="text-xs text-muted">
-                  {d.model ?? ""} {d.lastSeenUtc ? `· ${fmt.dateTime(d.lastSeenUtc)}` : ""}
+            <li key={d.serial} className="flex flex-wrap items-center gap-3 py-3">
+              <DeviceImage variant={d.variant} color={d.color} name={d.name} size={96} />
+              <div className="grid flex-1 gap-2 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <div className="font-mono text-xs text-muted">{d.serial}</div>
+                  <div className="text-xs text-muted">
+                    {d.model ?? ""} {d.lastSeenUtc ? `· ${fmt.dateTime(d.lastSeenUtc)}` : ""}
+                  </div>
+                </div>
+                <label className="text-xs text-text-2">
+                  {t.settings.deviceName}
+                  <input
+                    className="ui-input mt-1 w-full"
+                    value={deviceNames[d.serial] ?? ""}
+                    onChange={(e) => setDeviceNames({ ...deviceNames, [d.serial]: e.target.value })}
+                    onBlur={(e) => e.target.value.trim() && e.target.value !== d.name && run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, name: e.target.value }))}
+                  />
+                </label>
+                <label className="text-xs text-text-2">
+                  {t.settings.owner}
+                  <select
+                    className="ui-input mt-1 w-full"
+                    value={d.userId ?? ""}
+                    onChange={(e) => run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, user_id: e.target.value ? Number(e.target.value) : null }))}
+                  >
+                    <option value="">{t.common.unassigned}</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-xs text-text-2">
+                  {t.settings.deviceImage}
+                  <select
+                    className="ui-input mt-1 w-full"
+                    value={d.variant}
+                    onChange={(e) => run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, variant: e.target.value }))}
+                  >
+                    {variants.map((v) => (
+                      <option key={v.key} value={v.key}>
+                        {v.model} · {v.colour}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="text-xs text-text-2">
+                  {t.settings.deviceColor}
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      type="color"
+                      className="h-9 w-12 cursor-pointer rounded border border-border bg-surface"
+                      defaultValue={d.color}
+                      onBlur={(e) => e.target.value !== d.color && run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, color: e.target.value }))}
+                    />
+                    <code className="font-mono text-xs">{d.color}</code>
+                    <button
+                      type="button"
+                      className="ui-btn h-8 text-xs"
+                      onClick={() => {
+                        const v = variants.find((x) => x.key === d.variant);
+                        if (v) run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, color: v.suggestedColor }));
+                      }}
+                    >
+                      {t.settings.useSuggested}
+                    </button>
+                  </div>
                 </div>
               </div>
-              <input
-                className="ui-input"
-                aria-label={t.settings.deviceName}
-                value={deviceNames[d.serial] ?? ""}
-                onChange={(e) => setDeviceNames({ ...deviceNames, [d.serial]: e.target.value })}
-                onBlur={(e) => e.target.value.trim() && e.target.value !== d.name && run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, name: e.target.value }))}
-              />
-              <select
-                className="ui-input"
-                aria-label={t.settings.owner}
-                value={d.userId ?? ""}
-                onChange={(e) => run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, user_id: e.target.value ? Number(e.target.value) : null }))}
-              >
-                <option value="">{t.common.unassigned}</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
             </li>
           ))}
         </ul>

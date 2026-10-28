@@ -8,6 +8,8 @@ import { localDayRangeUtc, todayKey, DISPLAY_TZ } from "@/lib/time";
 export interface DeviceOverview {
   serial: string;
   name: string;
+  color: string;
+  variant: string;
   model: string | null;
   user: { id: number; name: string; color: string } | null;
   connected: boolean;
@@ -65,6 +67,8 @@ export function deviceOverview(device: schema.Device): DeviceOverview {
   return {
     serial: device.serial,
     name: device.name,
+    color: device.color,
+    variant: device.variant,
     model: device.model,
     user: user ? { id: user.id, name: user.name, color: user.color } : null,
     connected,
@@ -94,6 +98,12 @@ export interface StatsQuery {
   from: string;
   to: string;
   groupBy: GroupBy;
+  /** Drop records flagged as clock suspects. */
+  excludeSuspect?: boolean;
+}
+
+function isoNoMs(d: Date): string {
+  return d.toISOString().replace(/\.\d{3}Z$/, "+00:00");
 }
 
 export function statsFor(q: StatsQuery): StatsResult {
@@ -113,12 +123,50 @@ export function statsFor(q: StatsQuery): StatsResult {
         inArray(schema.events.serial, q.serials),
         eq(schema.events.status, "ok"),
         isNotNull(schema.events.timestampUtc),
-        gte(schema.events.timestampUtc, startUtc.toISOString().replace(/\.\d{3}Z$/, "+00:00")),
-        lt(schema.events.timestampUtc, endUtcExclusive.toISOString().replace(/\.\d{3}Z$/, "+00:00")),
+        gte(schema.events.timestampUtc, isoNoMs(startUtc)),
+        lt(schema.events.timestampUtc, isoNoMs(endUtcExclusive)),
+        ...(q.excludeSuspect ? [eq(schema.events.clockSuspect, 0)] : []),
       ),
     )
     .all() as StatRow[];
   return computeStats(rows, q.from, q.to, q.groupBy, DISPLAY_TZ);
+}
+
+export interface DayRecord {
+  serial: string;
+  eventId: number;
+  timestampUtc: string;
+  puffCount: number | null;
+  clockSuspect: boolean;
+}
+
+/** Timestamped records of the given devices inside local days [from, to] (drill-down from the charts). */
+export function recordsInRange(serials: string[], from: string, to: string, excludeSuspect = false, limit = 1000): DayRecord[] {
+  if (!serials.length) return [];
+  const { startUtc, endUtcExclusive } = localDayRangeUtc(from, to);
+  const rows = getDb()
+    .select({
+      serial: schema.events.serial,
+      eventId: schema.events.eventId,
+      timestampUtc: schema.events.timestampUtc,
+      puffCount: schema.events.puffCount,
+      clockSuspect: schema.events.clockSuspect,
+    })
+    .from(schema.events)
+    .where(
+      and(
+        inArray(schema.events.serial, serials),
+        eq(schema.events.status, "ok"),
+        isNotNull(schema.events.timestampUtc),
+        gte(schema.events.timestampUtc, isoNoMs(startUtc)),
+        lt(schema.events.timestampUtc, isoNoMs(endUtcExclusive)),
+        ...(excludeSuspect ? [eq(schema.events.clockSuspect, 0)] : []),
+      ),
+    )
+    .orderBy(desc(schema.events.timestampUtc))
+    .limit(limit)
+    .all();
+  return rows.map((r) => ({ ...r, timestampUtc: r.timestampUtc!, clockSuspect: !!r.clockSuspect }));
 }
 
 export interface EventPage {
@@ -136,10 +184,16 @@ export interface EventPage {
   total: number;
 }
 
-export function eventPage(serial: string, offset: number, limit: number, status?: string): EventPage {
+export function eventPage(serial: string, offset: number, limit: number, status?: string, validOnly = false): EventPage {
   const sqlite = getSqlite();
-  const where = status ? "WHERE e.serial = ? AND e.status = ?" : "WHERE e.serial = ?";
-  const args = status ? [serial, status] : [serial];
+  let where = "WHERE e.serial = ?";
+  const args: (string | number)[] = [serial];
+  if (status) {
+    where += " AND e.status = ?";
+    args.push(status);
+  } else if (validOnly) {
+    where += " AND e.status = 'ok'";
+  }
   const total = (sqlite.prepare(`SELECT count(*) AS n FROM events e ${where}`).get(...args) as { n: number }).n;
   const rows = sqlite
     .prepare(

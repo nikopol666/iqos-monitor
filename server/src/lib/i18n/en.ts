@@ -76,6 +76,12 @@ export const en = {
     chartSticks: "Sticks per {unit}",
     chartPuffs: "Puffs per {unit}",
     presets: { last7: "7 days", last30: "30 days", last90: "3 months", year: "1 year", all: "All" },
+    excludeSuspect: "Hide records with suspicious clock",
+    clickHint: "Click a bar or a row to zoom in. Click a device in the legend to show or hide it.",
+    drillTitle: "Records on {period}",
+    drillEmpty: "No records in this period.",
+    back: "Back",
+    perDevice: "By device",
   },
   device: {
     title: "Device",
@@ -116,6 +122,8 @@ export const en = {
     endNotice: "Observed end",
     liveSamples: "Live changes",
     puffPairs: "Event pairs (raw, meaning not verified)",
+    showInvalid: "Show invalid records (empty, timeouts, CRC errors)",
+    invalidCount: "{n} hidden",
   },
   settings: {
     title: "Settings",
@@ -127,6 +135,9 @@ export const en = {
     devicesHint: "Assign each device to a user and give it a friendly name.",
     deviceName: "Name",
     owner: "Owner",
+    deviceColor: "Chart colour",
+    deviceImage: "Model / finish",
+    useSuggested: "Use the finish colour",
     agents: "Agents",
     agentsHint:
       "An API key identifies a Windows agent. Generate a key, paste it into the agent settings. It is shown only once.",

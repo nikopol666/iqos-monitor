@@ -78,6 +78,12 @@ export const cs: Dictionary = {
     chartSticks: "Náplně za {unit}",
     chartPuffs: "Potáhnutí za {unit}",
     presets: { last7: "7 dní", last30: "30 dní", last90: "3 měsíce", year: "1 rok", all: "Vše" },
+    excludeSuspect: "Skrýt záznamy s podezřelými hodinami",
+    clickHint: "Kliknutím na sloupec nebo řádek přiblížíš období. Kliknutím na zařízení v legendě ho skryješ nebo zobrazíš.",
+    drillTitle: "Záznamy – {period}",
+    drillEmpty: "V tomto období nejsou žádné záznamy.",
+    back: "Zpět",
+    perDevice: "Podle zařízení",
   },
   device: {
     title: "Zařízení",
@@ -118,6 +124,8 @@ export const cs: Dictionary = {
     endNotice: "Pozorovaný konec",
     liveSamples: "Živé změny",
     puffPairs: "Dvojice událostí (raw, význam neověřen)",
+    showInvalid: "Zobrazit neplatné záznamy (prázdné, timeouty, chyby CRC)",
+    invalidCount: "{n} skryto",
   },
   settings: {
     title: "Nastavení",
@@ -129,6 +137,9 @@ export const cs: Dictionary = {
     devicesHint: "Přiřaď každé zařízení uživateli a pojmenuj ho.",
     deviceName: "Název",
     owner: "Vlastník",
+    deviceColor: "Barva v grafech",
+    deviceImage: "Model / provedení",
+    useSuggested: "Použít barvu provedení",
     agents: "Agenti",
     agentsHint:
       "API klíč identifikuje Windows agenta. Vygeneruj klíč a vlož ho do nastavení agenta. Zobrazí se jen jednou.",

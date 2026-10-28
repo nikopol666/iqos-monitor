@@ -21,6 +21,10 @@ export const devices = sqliteTable("devices", {
   lowestStoredIndex: integer("lowest_stored_index"),
   fullHistoryComplete: integer("full_history_complete").notNull().default(0),
   clockWarning: integer("clock_warning").notNull().default(0),
+  /** Series colour used everywhere this device is drawn. */
+  color: text("color").notNull().default("#2a78d6"),
+  /** Image key under /public/devices (model + colour variant). */
+  variant: text("variant").notNull().default("iluma-i-one-breeze-blue"),
 });
 
 export const events = sqliteTable(

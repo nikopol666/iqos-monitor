@@ -27,6 +27,12 @@ export async function GET(request: Request) {
     const userId = parseInt(userParam, 10);
     serials = all.filter((d) => d.userId === userId).map((d) => d.serial);
   }
-  const result = statsFor({ serials, from, to, groupBy: group });
-  return json({ ...result, serials, devices: all.filter((d) => serials.includes(d.serial)).map((d) => ({ serial: d.serial, name: d.name })) });
+  const excludeSuspect = url.searchParams.get("suspect") === "0";
+  const result = statsFor({ serials, from, to, groupBy: group, excludeSuspect });
+  return json({
+    ...result,
+    serials,
+    excludeSuspect,
+    devices: all.filter((d) => serials.includes(d.serial)).map((d) => ({ serial: d.serial, name: d.name, color: d.color })),
+  });
 }

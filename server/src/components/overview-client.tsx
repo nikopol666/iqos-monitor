@@ -6,6 +6,7 @@ import { BatteryMedium, Cable, CircleDot, Usb } from "lucide-react";
 import type { DeviceOverview } from "@/lib/queries";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import { Badge, Empty } from "@/components/ui";
+import { DeviceImage } from "@/components/device-image";
 
 export function OverviewClient({ initial }: { initial: DeviceOverview[] }) {
   const { t, f } = useI18n();
@@ -40,7 +41,7 @@ export function OverviewClient({ initial }: { initial: DeviceOverview[] }) {
   return (
     <div className={`space-y-4 transition-opacity ${stale ? "opacity-60" : ""}`}>
       <h1 className="text-xl font-semibold">{t.overview.title}</h1>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {devices.map((d) => (
           <DeviceCard key={d.serial} d={d} />
         ))}
@@ -51,60 +52,75 @@ export function OverviewClient({ initial }: { initial: DeviceOverview[] }) {
   function DeviceCard({ d }: { d: DeviceOverview }) {
     const stickIn = d.live?.stickState === "01";
     return (
-      <Link href={`/devices/${d.serial}`} className="ui-card block p-4 transition-colors hover:border-accent sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold">{d.name}</span>
-              {d.user ? (
-                <span className="inline-flex items-center gap-1 text-xs text-text-2">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: d.user.color }} aria-hidden />
-                  {d.user.name}
-                </span>
+      <Link
+        href={`/devices/${d.serial}`}
+        className="ui-card relative block overflow-hidden p-4 transition-colors hover:border-accent sm:p-5"
+        style={{ borderTopColor: d.color, borderTopWidth: 3 }}
+      >
+        <div className="flex gap-4">
+          <DeviceImage variant={d.variant} color={d.color} name={d.name} size={150} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-block h-3 w-3 rounded-full" style={{ background: d.color }} aria-hidden />
+                  <span className="truncate text-lg font-semibold">{d.name}</span>
+                  {d.user ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-text-2">
+                      <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: d.user.color }} aria-hidden />
+                      {d.user.name}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted">{t.common.unassigned}</span>
+                  )}
+                </div>
+                <div className="font-mono text-xs text-muted">{d.serial}</div>
+              </div>
+              {d.connected ? (
+                <Badge tone="good">
+                  <Usb size={12} aria-hidden /> {t.overview.connected}
+                </Badge>
               ) : (
-                <span className="text-xs text-muted">{t.common.unassigned}</span>
+                <Badge>
+                  <Cable size={12} aria-hidden /> {t.overview.offline}
+                </Badge>
               )}
             </div>
-            <div className="font-mono text-xs text-muted">{d.serial}</div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              <Metric
+                label={t.overview.battery}
+                value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
+                icon={<BatteryMedium size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
+              />
+              <Metric
+                label={d.connected ? (stickIn ? t.overview.stickInserted : t.overview.stickEmpty) : t.overview.today}
+                value={
+                  d.connected ? (
+                    <CircleDot size={18} aria-hidden className={stickIn ? "text-accent" : "text-muted"} />
+                  ) : (
+                    `${fmt.integer(d.today.sessions)} / ${fmt.integer(d.today.puffs)}`
+                  )
+                }
+              />
+              <Metric label={t.overview.lifetimeSticks} value={fmt.integer(d.lifetime.sticks)} />
+              <Metric label={t.overview.lifetimePuffs} value={fmt.integer(d.lifetime.puffs)} />
+            </div>
           </div>
-          {d.connected ? (
-            <Badge tone="good">
-              <Usb size={12} aria-hidden /> {t.overview.connected}
-            </Badge>
-          ) : (
-            <Badge>
-              <Cable size={12} aria-hidden /> {d.live?.disconnectedUtc ? f(t.overview.offlineSince, { time: fmt.dateTime(d.live.disconnectedUtc) }) : d.lastSeenUtc ? f(t.overview.lastSeen, { time: fmt.dateTime(d.lastSeenUtc) }) : t.overview.neverConnected}
-            </Badge>
-          )}
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <Metric
-            label={t.overview.battery}
-            value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
-            icon={<BatteryMedium size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
-          />
-          <Metric
-            label={d.connected ? (stickIn ? t.overview.stickInserted : t.overview.stickEmpty) : t.overview.today}
-            value={
-              d.connected ? (
-                <CircleDot size={18} aria-hidden className={stickIn ? "text-accent" : "text-muted"} />
-              ) : (
-                `${fmt.integer(d.today.sessions)} / ${fmt.integer(d.today.puffs)}`
-              )
-            }
-          />
-          <Metric label={t.overview.lifetimeSticks} value={fmt.integer(d.lifetime.sticks)} />
-          <Metric label={t.overview.lifetimePuffs} value={fmt.integer(d.lifetime.puffs)} />
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-2">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-2">
           <span>
             {t.overview.today}: {f(t.overview.todaySticks, { n: fmt.integer(d.today.sessions) })} · {f(t.overview.todayPuffs, { n: fmt.integer(d.today.puffs) })}
           </span>
           {d.lifetime.seconds != null ? (
             <span>
               {t.overview.lifetimeHours}: {fmt.number(Math.round((d.lifetime.seconds / 3600) * 10) / 10)} h
+            </span>
+          ) : null}
+          {!d.connected ? (
+            <span className="text-muted">
+              {d.live?.disconnectedUtc ? f(t.overview.offlineSince, { time: fmt.dateTime(d.live.disconnectedUtc) }) : d.lastSeenUtc ? f(t.overview.lastSeen, { time: fmt.dateTime(d.lastSeenUtc) }) : t.overview.neverConnected}
             </span>
           ) : null}
           {d.job ? (

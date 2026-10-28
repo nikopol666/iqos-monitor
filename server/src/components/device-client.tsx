@@ -6,6 +6,7 @@ import type { DeviceOverview, EventPage } from "@/lib/queries";
 import type { LiveSample } from "@/db/schema";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import { Badge, Card, CardTitle, Notice } from "@/components/ui";
+import { DeviceImage } from "@/components/device-image";
 
 interface SnapshotView {
   collectedUtc: string;
@@ -13,13 +14,25 @@ interface SnapshotView {
   statuses: Record<string, string>;
 }
 
-export function DeviceClient({ initial, snapshot, firstPage, samples }: { initial: DeviceOverview; snapshot: SnapshotView | null; firstPage: EventPage; samples: LiveSample[] }) {
+export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples }: { initial: DeviceOverview; snapshot: SnapshotView | null; firstPage: EventPage; totalAll: number; samples: LiveSample[] }) {
   const { t, f } = useI18n();
   const fmt = useFormat();
   const [d, setD] = useState(initial);
   const [page, setPage] = useState(firstPage);
+  const [showInvalid, setShowInvalid] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  async function reloadRecords(invalid: boolean) {
+    setShowInvalid(invalid);
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/api/devices/${initial.serial}/events?offset=0&limit=100${invalid ? "" : "&valid=1"}`, { cache: "no-store" });
+      setPage((await res.json()) as EventPage);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   // Live refresh of the card (1 s) via the shared overview endpoint.
   useEffect(() => {
@@ -59,7 +72,7 @@ export function DeviceClient({ initial, snapshot, firstPage, samples }: { initia
   async function loadMore() {
     setLoadingMore(true);
     try {
-      const res = await fetch(`/api/devices/${d.serial}/events?offset=${page.items.length}&limit=100`, { cache: "no-store" });
+      const res = await fetch(`/api/devices/${d.serial}/events?offset=${page.items.length}&limit=100${showInvalid ? "" : "&valid=1"}`, { cache: "no-store" });
       const next = (await res.json()) as EventPage;
       setPage({ total: next.total, items: [...page.items, ...next.items] });
     } finally {
@@ -89,6 +102,7 @@ export function DeviceClient({ initial, snapshot, firstPage, samples }: { initia
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
+        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={72} />
         <h1 className="text-xl font-semibold">{d.name}</h1>
         {d.user ? (
           <span className="inline-flex items-center gap-1 text-sm text-text-2">
@@ -156,7 +170,22 @@ export function DeviceClient({ initial, snapshot, firstPage, samples }: { initia
       </div>
 
       <Card>
-        <CardTitle right={<span className="text-xs text-muted">{fmt.integer(page.items.length)} / {fmt.integer(page.total)}</span>}>{t.device.records}</CardTitle>
+        <CardTitle
+          right={
+            <span className="flex items-center gap-3 text-xs text-muted">
+              <label className="flex items-center gap-1.5">
+                <input type="checkbox" checked={showInvalid} onChange={(e) => reloadRecords(e.target.checked)} />
+                {t.device.showInvalid}
+                {!showInvalid && totalAll > page.total ? ` (${f(t.device.invalidCount, { n: fmt.integer(totalAll - page.total) })})` : ""}
+              </label>
+              <span>
+                {fmt.integer(page.items.length)} / {fmt.integer(page.total)}
+              </span>
+            </span>
+          }
+        >
+          {t.device.records}
+        </CardTitle>
         {page.items.length === 0 ? (
           <Notice tone="info">{t.device.noRecords}</Notice>
         ) : (

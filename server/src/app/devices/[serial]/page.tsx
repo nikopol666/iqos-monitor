@@ -19,7 +19,8 @@ export default async function DevicePage({ params }: PageProps<"/devices/[serial
             }
           : null
       }
-      firstPage={eventPage(serial, 0, 100)}
+      firstPage={eventPage(serial, 0, 100, undefined, true)}
+      totalAll={eventPage(serial, 0, 1).total}
       samples={recentLiveSamples(serial, 40)}
     />
   );

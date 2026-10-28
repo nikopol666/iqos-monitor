@@ -2,7 +2,7 @@
  * Everything the agent API writes: devices, archive events, snapshots, live
  * state and jobs. Pure functions over the shared SQLite handle.
  */
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { getDb, getSqlite, nowUtc, schema } from "@/db";
 import { decodeEvent, parseSnapshotFrames, type ClassicKey } from "@/lib/protocol";
 
@@ -14,12 +14,20 @@ const DEFAULT_NAMES: Record<string, string> = {
   DEVICEB0000002: "Modra",
 };
 
+/** Categorical palette (dataviz reference order); a new device takes the next free slot. */
+export const SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"];
+
 export function ensureDevice(serial: string): void {
   const db = getDb();
   const now = nowUtc();
+  const existing = db.select({ serial: schema.devices.serial }).from(schema.devices).where(eq(schema.devices.serial, serial)).get();
+  if (existing) {
+    db.update(schema.devices).set({ lastSeenUtc: now }).where(eq(schema.devices.serial, serial)).run();
+    return;
+  }
+  const count = (getSqlite().prepare("SELECT count(*) AS n FROM devices").get() as { n: number }).n;
   db.insert(schema.devices)
-    .values({ serial, name: DEFAULT_NAMES[serial] ?? serial, firstSeenUtc: now, lastSeenUtc: now })
-    .onConflictDoUpdate({ target: schema.devices.serial, set: { lastSeenUtc: now } })
+    .values({ serial, name: DEFAULT_NAMES[serial] ?? serial, firstSeenUtc: now, lastSeenUtc: now, color: SERIES_COLORS[count % SERIES_COLORS.length], variant: "iluma-i-one-breeze-blue" })
     .run();
 }
 
@@ -276,13 +284,23 @@ export function createJob(serial: string, type: JobType, payload?: unknown): sch
     .get();
 }
 
+/**
+ * Open jobs for the given devices plus jobs cancelled in the last 15 minutes,
+ * so a running agent learns about a cancellation on its next heartbeat.
+ */
 export function pendingJobs(serials: string[]): schema.AgentJob[] {
   if (!serials.length) return [];
   const db = getDb();
+  const recent = new Date(Date.now() - 15 * 60 * 1000).toISOString().replace(/\.\d{3}Z$/, "+00:00");
   return db
     .select()
     .from(schema.agentJobs)
-    .where(and(inArray(schema.agentJobs.serial, serials), inArray(schema.agentJobs.status, ["queued", "running"])))
+    .where(
+      and(
+        inArray(schema.agentJobs.serial, serials),
+        or(inArray(schema.agentJobs.status, ["queued", "running"]), and(eq(schema.agentJobs.status, "cancelled"), gte(schema.agentJobs.updatedUtc, recent))),
+      ),
+    )
     .orderBy(schema.agentJobs.id)
     .all();
 }
