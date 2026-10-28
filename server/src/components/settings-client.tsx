@@ -14,6 +14,7 @@ import { colorCss, isHexColor, lowContrastModes, type PaletteColor } from "@/lib
 interface DeviceRow {
   serial: string;
   name: string;
+  label: string;
   userId: number | null;
   model: string | null;
   lastSeenUtc: string | null;
@@ -129,7 +130,7 @@ export function SettingsClient({
         <ul className="divide-y divide-border">
           {devices.map((d) => (
             <li key={d.serial} className="flex flex-wrap items-center gap-3 py-3">
-              <DeviceImage variant={d.variant} color={d.color} name={d.name} size={96} />
+              <DeviceImage variant={d.variant} color={d.color} name={d.label} size={96} />
               <div className="grid flex-1 gap-2 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <div className="font-mono text-xs text-muted">{d.serial}</div>
@@ -141,9 +142,10 @@ export function SettingsClient({
                   {t.settings.deviceName}
                   <input
                     className="ui-input mt-1 w-full"
+                    placeholder={d.label}
                     value={deviceNames[d.serial] ?? ""}
                     onChange={(e) => setDeviceNames({ ...deviceNames, [d.serial]: e.target.value })}
-                    onBlur={(e) => e.target.value.trim() && e.target.value !== d.name && run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, name: e.target.value }))}
+                    onBlur={(e) => e.target.value.trim() !== d.name.trim() && run(() => call("/api/settings/devices", "PATCH", { serial: d.serial, name: e.target.value }))}
                   />
                 </label>
                 <label className="text-xs text-text-2">

@@ -1,5 +1,5 @@
 import { badRequest, json } from "@/lib/api";
-import { listDevices, statsFor } from "@/lib/queries";
+import { listDevicesLabeled as listDevices, statsFor } from "@/lib/queries";
 import { isDateKey, addDays, todayKey } from "@/lib/time";
 import type { GroupBy } from "@/lib/stats";
 

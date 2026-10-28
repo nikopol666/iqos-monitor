@@ -1,4 +1,4 @@
-import { listDevices, listUsers } from "@/lib/queries";
+import { listDevicesLabeled as listDevices, listUsers } from "@/lib/queries";
 import { StatsClient } from "@/components/stats-client";
 import { addDays, todayKey } from "@/lib/time";
 

@@ -135,7 +135,7 @@ export const cs: Dictionary = {
     color: "Barva",
     devices: "Zařízení",
     devicesHint: "Přiřaď každé zařízení uživateli a pojmenuj ho.",
-    deviceName: "Název",
+    deviceName: "Název (nepovinný)",
     owner: "Vlastník",
     deviceColor: "Barva v grafech",
     deviceImage: "Model / provedení",

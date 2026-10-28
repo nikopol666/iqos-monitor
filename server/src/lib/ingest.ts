@@ -10,11 +10,6 @@ import { DEFAULT_VARIANT, defaultColorFor } from "@/lib/variants";
 export const CLOCK_JUMP_DAYS = 30;
 export const LIVE_TIMEOUT_SECONDS = 10;
 
-const DEFAULT_NAMES: Record<string, string> = {
-  DEVICEA0000001: "Fialova",
-  DEVICEB0000002: "Modra",
-};
-
 export function colorsInUse(exceptSerial?: string): string[] {
   const rows = getSqlite().prepare("SELECT serial, color FROM devices").all() as { serial: string; color: string }[];
   return rows.filter((r) => r.serial !== exceptSerial).map((r) => r.color);
@@ -31,7 +26,7 @@ export function ensureDevice(serial: string): void {
   db.insert(schema.devices)
     .values({
       serial,
-      name: DEFAULT_NAMES[serial] ?? serial,
+      name: "",
       firstSeenUtc: now,
       lastSeenUtc: now,
       variant: DEFAULT_VARIANT,

@@ -15,12 +15,8 @@ from typing import Optional
 
 VID = 0x2759
 PID = 0x0003
-# Default display names for known test devices; any other serial is accepted
-# and named after its serial until renamed in the server settings.
-NAMES = {
-    "DEVICEA0000001": "Fialova",
-    "DEVICEB0000002": "Modra",
-}
+# Display names come from the server (heartbeat); locally a device is its serial.
+NAMES: dict[str, str] = {}
 
 
 def device_name(serial: Optional[str]) -> str:

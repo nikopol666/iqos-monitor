@@ -4,6 +4,7 @@ import { getDb, getSqlite, schema } from "@/db";
 import { isLiveConnected, latestJob } from "@/lib/ingest";
 import { computeStats, type GroupBy, type StatRow, type StatsResult } from "@/lib/stats";
 import { localDayRangeUtc, todayKey, DISPLAY_TZ } from "@/lib/time";
+import { deviceLabel } from "@/lib/variants";
 
 export interface DeviceOverview {
   serial: string;
@@ -29,7 +30,13 @@ export function listUsers(): schema.User[] {
 }
 
 export function listDevices(): schema.Device[] {
-  return getDb().select().from(schema.devices).orderBy(schema.devices.name).all();
+  return getDb().select().from(schema.devices).orderBy(schema.devices.name, schema.devices.serial).all();
+}
+
+/** Devices with `name` resolved to the display label (model · finish when unnamed). */
+export function listDevicesLabeled(): (schema.Device & { rawName: string })[] {
+  const all = listDevices();
+  return all.map((d) => ({ ...d, rawName: d.name, name: deviceLabel(d.name, d.variant, d.serial, all) }));
 }
 
 export function getDevice(serial: string): schema.Device | undefined {
@@ -56,7 +63,7 @@ function todayCounts(serial: string): { records: number; sessions: number; puffs
   return { records: row.records, sessions: row.sessions ?? 0, puffs: row.puffs ?? 0 };
 }
 
-export function deviceOverview(device: schema.Device): DeviceOverview {
+export function deviceOverview(device: schema.Device, siblings: schema.Device[] = listDevices()): DeviceOverview {
   const db = getDb();
   const live = db.select().from(schema.liveState).where(eq(schema.liveState.serial, device.serial)).get() ?? null;
   const user = device.userId ? (db.select().from(schema.users).where(eq(schema.users.id, device.userId)).get() ?? null) : null;
@@ -66,7 +73,7 @@ export function deviceOverview(device: schema.Device): DeviceOverview {
   const job = latestJob(device.serial);
   return {
     serial: device.serial,
-    name: device.name,
+    name: deviceLabel(device.name, device.variant, device.serial, siblings),
     color: device.color,
     variant: device.variant,
     model: device.model,
@@ -90,7 +97,8 @@ export function deviceOverview(device: schema.Device): DeviceOverview {
 }
 
 export function overview(): DeviceOverview[] {
-  return listDevices().map(deviceOverview);
+  const all = listDevices();
+  return all.map((d) => deviceOverview(d, all));
 }
 
 export interface StatsQuery {

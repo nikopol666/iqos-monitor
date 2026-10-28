@@ -3,6 +3,7 @@ import { authenticateAgent, touchAgent, unauthorized } from "@/lib/auth";
 import { badRequest, json, readJson, validSerial } from "@/lib/api";
 import { ensureDevice, pendingJobs, updateLive } from "@/lib/ingest";
 import { getDb, schema } from "@/db";
+import { deviceLabel } from "@/lib/variants";
 
 interface HeartbeatBody {
   agent?: { name?: string; version?: string; hostname?: string };
@@ -29,10 +30,11 @@ export async function POST(request: Request) {
   }
   const db = getDb();
   const rows = serials.length ? db.select().from(schema.devices).where(inArray(schema.devices.serial, serials)).all() : [];
+  const allDevices = db.select().from(schema.devices).all();
   const devices: Record<string, unknown> = {};
   for (const r of rows) {
     devices[r.serial] = {
-      name: r.name,
+      name: deviceLabel(r.name, r.variant, r.serial, allDevices),
       acked_next_index: r.ackedNextIndex,
       lowest_stored_index: r.lowestStoredIndex,
       full_history_complete: !!r.fullHistoryComplete,

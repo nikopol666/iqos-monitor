@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { getDb, schema } from "@/db";
-import { listDevices, listUsers } from "@/lib/queries";
+import { listDevicesLabeled, listUsers } from "@/lib/queries";
 import { LOCALE_COOKIE } from "@/lib/i18n";
 import { SettingsClient } from "@/components/settings-client";
 import { DEVICE_VARIANTS, defaultColorFor } from "@/lib/variants";
@@ -24,9 +24,10 @@ export default async function SettingsPage() {
   return (
     <SettingsClient
       users={listUsers()}
-      devices={listDevices().map((d) => ({
+      devices={listDevicesLabeled().map((d) => ({
         serial: d.serial,
-        name: d.name,
+        name: d.rawName,
+        label: d.name,
         userId: d.userId,
         model: d.model,
         lastSeenUtc: d.lastSeenUtc,

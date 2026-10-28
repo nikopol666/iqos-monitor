@@ -133,7 +133,7 @@ export const en = {
     color: "Color",
     devices: "Devices",
     devicesHint: "Assign each device to a user and give it a friendly name.",
-    deviceName: "Name",
+    deviceName: "Name (optional)",
     owner: "Owner",
     deviceColor: "Chart colour",
     deviceImage: "Model / finish",

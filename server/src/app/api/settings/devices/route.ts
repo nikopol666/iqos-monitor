@@ -24,7 +24,7 @@ export async function PATCH(request: Request) {
   const current = db.select().from(schema.devices).where(eq(schema.devices.serial, body.serial)).get();
   if (!current) return notFound();
   const patch: Partial<schema.Device> = {};
-  if (typeof body.name === "string" && body.name.trim()) patch.name = body.name.trim().slice(0, 60);
+  if (typeof body.name === "string") patch.name = body.name.trim().slice(0, 60);
   if (body.user_id === null) patch.userId = null;
   else if (Number.isInteger(body.user_id)) {
     const user = db.select().from(schema.users).where(eq(schema.users.id, body.user_id!)).get();

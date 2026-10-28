@@ -1,5 +1,5 @@
 import { badRequest, json } from "@/lib/api";
-import { listDevices, recordsInRange } from "@/lib/queries";
+import { listDevicesLabeled as listDevices, recordsInRange } from "@/lib/queries";
 import { isDateKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";

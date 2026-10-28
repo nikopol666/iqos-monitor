@@ -44,3 +44,21 @@ export function defaultColorFor(variant: string, colorsInUse: string[]): string 
   if (!colorsInUse.includes(preferred)) return preferred;
   return PALETTE_KEYS.find((k) => !colorsInUse.includes(k)) ?? preferred;
 }
+
+/**
+ * Display label: the user-given name, otherwise "<model> · <finish>", with the
+ * serial tail appended when another unnamed device shares the same finish.
+ */
+export function deviceLabel(
+  name: string | null | undefined,
+  variant: string,
+  serial: string,
+  siblings: { serial: string; variant: string; name: string | null }[] = [],
+): string {
+  const clean = (name ?? "").trim();
+  if (clean) return clean;
+  const v = DEVICE_VARIANTS.find((x) => x.key === variant) ?? DEVICE_VARIANTS[0];
+  const base = `${v.model} · ${v.colour}`;
+  const clash = siblings.some((d) => d.serial !== serial && d.variant === variant && !(d.name ?? "").trim());
+  return clash ? `${base} (${serial.slice(-4)})` : base;
+}
