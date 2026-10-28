@@ -21,6 +21,13 @@ export const READ_COMMANDS = {
   brightness: "c00223c3",
   vibration: "c90023e9",
   flexbattery: "c90025fb",
+  // Read-only probes from hauntedfail/iqos; same SCP frames over USB.
+  flexpuff: "d205220300000017",
+  autostart: "c907240100000022",
+  pause_mode: "c907240200000018",
+  holder_firmware: "c9000000",
+  epoch: "c003003f",
+  conversion: "c00020e0",
 } as const;
 
 export type ClassicKey = keyof typeof READ_COMMANDS;
@@ -52,6 +59,18 @@ export interface SnapshotValues {
   brightness_raw: string | null;
   vibration_raw: string | null;
   flexbattery_raw: string | null;
+  flexpuff_enabled: boolean | null;
+  autostart_enabled: boolean | null;
+  pause_mode_enabled: boolean | null;
+  holder_firmware_raw: string | null;
+  epoch_raw: string | null;
+  conversion_raw: string | null;
+}
+
+/** Setting replies carry [setting id, value, 0, 0]; value 1 = enabled. */
+function flag(payload: Uint8Array | undefined, settingId: number): boolean | null {
+  if (!payload || payload.length < 2 || payload[0] !== settingId) return null;
+  return payload[1] === 1;
 }
 
 /** Re-derive snapshot values from stored raw frames (hex per command key). */
@@ -94,6 +113,12 @@ export function parseSnapshotFrames(frames: Partial<Record<ClassicKey, string>>)
     brightness_raw: hexOrNull("brightness"),
     vibration_raw: hexOrNull("vibration"),
     flexbattery_raw: hexOrNull("flexbattery"),
+    flexpuff_enabled: flag(payloads.flexpuff, 0x03),
+    autostart_enabled: flag(payloads.autostart, 0x01),
+    pause_mode_enabled: flag(payloads.pause_mode, 0x02),
+    holder_firmware_raw: hexOrNull("holder_firmware"),
+    epoch_raw: hexOrNull("epoch"),
+    conversion_raw: hexOrNull("conversion"),
   };
   return { values, statuses };
 }

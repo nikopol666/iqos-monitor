@@ -94,7 +94,16 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples }
     [t.device.errorCode, d.connected ? (d.live?.errorState ?? "—") : (v.error_state_code ?? "—")],
     [t.device.sensor83, v.sensor_83_raw_value ?? "—"],
     [t.device.sensor84, v.sensor_84_raw_value ?? "—"],
+    [t.device.flexpuff, onOff(v.flexpuff_enabled, snapshot?.statuses.flexpuff)],
+    [t.device.autostart, onOff(v.autostart_enabled, snapshot?.statuses.autostart)],
+    [t.device.pauseMode, onOff(v.pause_mode_enabled, snapshot?.statuses.pause_mode)],
   ];
+
+  function onOff(value: unknown, status: string | undefined): string {
+    if (value === true) return t.common.yes;
+    if (value === false) return t.common.no;
+    return status === "unsupported" ? t.device.unsupportedUsb : "—";
+  }
 
   const job = d.job;
   const progressPct = job && job.total ? Math.min(100, Math.round((job.done / job.total) * 100)) : 0;

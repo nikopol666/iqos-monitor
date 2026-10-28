@@ -24,6 +24,14 @@ READ_COMMANDS = {
     'brightness': 'c00223c3',
     'vibration': 'c90023e9',
     'flexbattery': 'c90025fb',
+    # Read-only probes taken from hauntedfail/iqos (BLE) – same SCP frames over USB.
+    # On ILUMA i ONE over USB only flexpuff answers; the rest return an error bit.
+    'flexpuff': 'd205220300000017',
+    'autostart': 'c907240100000022',
+    'pause_mode': 'c907240200000018',
+    'holder_firmware': 'c9000000',
+    'epoch': 'c003003f',
+    'conversion': 'c00020e0',
 }
 
 
@@ -121,5 +129,14 @@ def read_snapshot(dev):
     values['brightness_raw']=payloads.get('brightness',b'').hex() or None
     values['vibration_raw']=payloads.get('vibration',b'').hex() or None
     values['flexbattery_raw']=payloads.get('flexbattery',b'').hex() or None
+    fp=payloads.get('flexpuff',b'')
+    values['flexpuff_enabled']=(fp[1]==1) if len(fp)>=2 and fp[0]==0x03 else None
+    au=payloads.get('autostart',b'')
+    values['autostart_enabled']=(au[1]==1) if len(au)>=2 and au[0]==0x01 else None
+    pm=payloads.get('pause_mode',b'')
+    values['pause_mode_enabled']=(pm[1]==1) if len(pm)>=2 and pm[0]==0x02 else None
+    values['holder_firmware_raw']=payloads.get('holder_firmware',b'').hex() or None
+    values['epoch_raw']=payloads.get('epoch',b'').hex() or None
+    values['conversion_raw']=payloads.get('conversion',b'').hex() or None
     return {'values':values,'statuses':statuses,'frames':frames,
             'collected_utc':dt.datetime.now(dt.timezone.utc).isoformat()}
