@@ -11,9 +11,11 @@ VALUE_NAME = "IQOS Agent"
 def launch_command() -> str:
     if getattr(sys, "frozen", False):
         return f'"{sys.executable}"'
-    pythonw = Path(sys.executable).with_name("pythonw.exe")
-    exe = pythonw if pythonw.exists() else Path(sys.executable)
-    return f'"{exe}" -m iqos_agent'
+    # Running from source (needed on Windows 11 with Smart App Control, which
+    # blocks unsigned PyInstaller builds): the VBS launcher starts the signed
+    # pythonw.exe without a console window.
+    launcher = Path(__file__).resolve().parents[1] / "run_agent.vbs"
+    return f'wscript.exe "{launcher}"'
 
 
 def is_enabled() -> bool:

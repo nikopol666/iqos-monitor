@@ -59,6 +59,12 @@ py -3 -m iqos_agent --console  # debug mode, logs to stdout
 .\build_agent.ps1              # dist\IQOS-Agent.exe (PyInstaller, no console)
 ```
 
+**Windows 11 Smart App Control** blocks unsigned executables such as the
+PyInstaller build. On such machines run the agent from source instead:
+double-click `agentun_agent.vbs` (starts the signed `pythonw.exe` without a
+console; requires Python 3 and `pip install -r requirements.txt`). The
+"Start with Windows" switch in the tray menu registers that launcher.
+
 Settings are stored in `%APPDATA%\IQOS Agent\config.json` (server address,
 API key, language, autostart). The local SQLite buffer defaults to
 `Documents\IQOS History\history.sqlite3`, so archives downloaded by the old
