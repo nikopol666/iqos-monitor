@@ -22,6 +22,13 @@ export function useI18n(): I18nValue & { f: typeof fmt } {
   return { ...ctx, f: fmt };
 }
 
+/** Formats a YYYY-MM-DD key; anything else (week/month keys) is returned unchanged. */
+function safeFormat(formatter: Intl.DateTimeFormat, key: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return key;
+  const d = new Date(key + "T12:00:00Z");
+  return Number.isNaN(d.getTime()) ? key : formatter.format(d);
+}
+
 /** Intl formatting helpers bound to the current locale and display zone. */
 export function useFormat() {
   const { locale, tz } = useI18n();
@@ -38,8 +45,8 @@ export function useFormat() {
     dateTime: (iso: string | null | undefined) => (iso ? dateTime.format(new Date(iso)) : "—"),
     dateTimeSec: (iso: string | null | undefined) => (iso ? dateTimeSec.format(new Date(iso)) : "—"),
     date: (iso: string | null | undefined) => (iso ? date.format(new Date(iso)) : "—"),
-    dateKey: (key: string) => date.format(new Date(key + "T12:00:00Z")),
-    shortDateKey: (key: string) => shortDate.format(new Date(key + "T12:00:00Z")),
+    dateKey: (key: string) => safeFormat(date, key),
+    shortDateKey: (key: string) => safeFormat(shortDate, key),
     time: (iso: string | null | undefined) => (iso ? time.format(new Date(iso)) : "—"),
     number: (n: number | null | undefined) => (n == null ? "—" : number.format(n)),
     integer: (n: number | null | undefined) => (n == null ? "—" : integer.format(n)),

@@ -101,8 +101,9 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
     setView((v) => ({ ...v, ...patch }));
   }
 
+  const dataGroup: GroupBy = data?.groupBy ?? group;
   const visibleDevices = useMemo(() => (userId ? devices.filter((d) => d.userId === Number(userId)) : devices), [devices, userId]);
-  const unitLabel = group === "day" ? t.stats.day : group === "week" ? t.stats.week : t.stats.month;
+  const unitLabel = dataGroup === "day" ? t.stats.day : dataGroup === "week" ? t.stats.week : t.stats.month;
 
   const dateKeyFmt = fmt.dateKey;
   const shortDayFmt = fmt.shortDateKey;
@@ -119,8 +120,9 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
 
   const chartRows = useMemo(() => {
     if (!data) return [];
+    const g = data.groupBy;
     return data.buckets.map((b) => {
-      const row: Record<string, number | string> = { key: b.key, label: bucketLabel(b.key, group, true), full: bucketLabel(b.key, group), suspect: b.suspect };
+      const row: Record<string, number | string> = { key: b.key, label: bucketLabel(b.key, g, true), full: bucketLabel(b.key, g), suspect: b.suspect };
       let sessions = 0;
       let puffs = 0;
       for (const d of series) {
@@ -134,13 +136,13 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
       row.puffs = puffs;
       return row;
     });
-  }, [data, group, bucketLabel, series]);
+  }, [data, bucketLabel, series]);
 
   /** Click on a bucket: zoom to it one level finer, or list its records at day level. */
   async function openBucket(b: Bucket) {
-    if (group !== "day") {
+    if (dataGroup !== "day") {
       setHistory((h) => [...h, view]);
-      setView({ from: b.start, to: b.end, group: group === "month" ? "week" : "day" });
+      setView({ from: b.start, to: b.end, group: dataGroup === "month" ? "week" : "day" });
       return;
     }
     setDrill({ bucket: b, items: null });
@@ -298,7 +300,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                         </button>
                       }
                     >
-                      {f(t.stats.drillTitle, { period: bucketLabel(drill.bucket.key, group) })}
+                      {f(t.stats.drillTitle, { period: bucketLabel(drill.bucket.key, dataGroup) })}
                     </CardTitle>
                     {drill.items === null ? (
                       <div className="text-sm text-text-2">{t.common.loading}</div>
@@ -360,7 +362,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                         {data.buckets.map((b) => (
                           <tr key={b.key} className="cursor-pointer border-t border-border hover:bg-surface-2" onClick={() => openBucket(b)}>
                             <td className="py-1.5 pr-3">
-                              {bucketLabel(b.key, group)}
+                              {bucketLabel(b.key, dataGroup)}
                               {b.suspect ? <span title={t.device.clockSuspect}> ⚠</span> : null}
                             </td>
                             <td className="py-1.5 pr-3 text-right">{fmt.integer(b.records)}</td>
