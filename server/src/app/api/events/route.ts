@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const userId = parseInt(userParam, 10);
     serials = all.filter((d) => d.userId === userId).map((d) => d.serial);
   }
-  const excludeSuspect = url.searchParams.get("suspect") === "0";
+  const excludeSuspect = url.searchParams.get("suspect") !== "1";
   const items = recordsInRange(serials, from, to, excludeSuspect);
   return json({ items, devices: all.filter((d) => serials.includes(d.serial)).map((d) => ({ serial: d.serial, name: d.name, color: d.color })) });
 }

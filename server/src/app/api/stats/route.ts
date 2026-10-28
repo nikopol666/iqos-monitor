@@ -27,7 +27,8 @@ export async function GET(request: Request) {
     const userId = parseInt(userParam, 10);
     serials = all.filter((d) => d.userId === userId).map((d) => d.serial);
   }
-  const excludeSuspect = url.searchParams.get("suspect") === "0";
+  // Suspect-clock records are hidden unless suspect=1 is passed.
+  const excludeSuspect = url.searchParams.get("suspect") !== "1";
   const result = statsFor({ serials, from, to, groupBy: group, excludeSuspect });
   return json({
     ...result,

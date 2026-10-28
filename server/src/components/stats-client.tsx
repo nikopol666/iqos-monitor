@@ -21,7 +21,7 @@ interface UserOpt {
   name: string;
   color: string;
 }
-type StatsResponse = StatsResult & { serials: string[]; devices: { serial: string; name: string; color: string }[] };
+type StatsResponse = StatsResult & { serials: string[]; suspectHidden: number; devices: { serial: string; name: string; color: string }[] };
 
 interface View {
   from: string;
@@ -41,7 +41,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
   const [history, setHistory] = useState<View[]>([]);
   const [userId, setUserId] = useState<string>("");
   const [serial, setSerial] = useState<string>("");
-  const [excludeSuspect, setExcludeSuspect] = useState(false);
+  const [includeSuspect, setIncludeSuspect] = useState(false);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [data, setData] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,9 +54,9 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
     const params = new URLSearchParams();
     if (serial) params.set("device", serial);
     else if (userId) params.set("user", userId);
-    if (excludeSuspect) params.set("suspect", "0");
+    if (includeSuspect) params.set("suspect", "1");
     return params;
-  }, [serial, userId, excludeSuspect]);
+  }, [serial, userId, includeSuspect]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -228,8 +228,8 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
           </select>
         </label>
         <label className="flex h-8 items-center gap-2 text-xs text-text-2">
-          <input type="checkbox" checked={excludeSuspect} onChange={(e) => setExcludeSuspect(e.target.checked)} />
-          {t.stats.excludeSuspect}
+          <input type="checkbox" checked={includeSuspect} onChange={(e) => setIncludeSuspect(e.target.checked)} />
+          {t.stats.includeSuspect}
         </label>
       </div>
 
@@ -264,6 +264,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
 
       {error ? <Notice>{t.common.error}</Notice> : null}
       {data && data.totals.suspect > 0 ? <Notice>{t.stats.clockWarning}</Notice> : null}
+      {data && data.suspectHidden > 0 ? <Notice tone="info">{f(t.stats.suspectHidden, { n: fmt.integer(data.suspectHidden) })}</Notice> : null}
 
       <div className={`space-y-4 transition-opacity ${loading ? "opacity-60" : ""}`}>
         {data ? (

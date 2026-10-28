@@ -114,9 +114,9 @@ function isoNoMs(d: Date): string {
   return d.toISOString().replace(/\.\d{3}Z$/, "+00:00");
 }
 
-export function statsFor(q: StatsQuery): StatsResult {
+export function statsFor(q: StatsQuery): StatsResult & { suspectHidden: number } {
   const db = getDb();
-  if (!q.serials.length) return computeStats([], q.from, q.to, q.groupBy, DISPLAY_TZ);
+  if (!q.serials.length) return { ...computeStats([], q.from, q.to, q.groupBy, DISPLAY_TZ), suspectHidden: 0 };
   const { startUtc, endUtcExclusive } = localDayRangeUtc(q.from, q.to);
   const rows = db
     .select({
@@ -137,7 +137,19 @@ export function statsFor(q: StatsQuery): StatsResult {
       ),
     )
     .all() as StatRow[];
-  return computeStats(rows, q.from, q.to, q.groupBy, DISPLAY_TZ);
+  let suspectHidden = 0;
+  if (q.excludeSuspect) {
+    const placeholders = q.serials.map(() => "?").join(",");
+    suspectHidden = (
+      getSqlite()
+        .prepare(
+          `SELECT count(*) AS n FROM events WHERE serial IN (${placeholders}) AND status = 'ok' AND clock_suspect = 1
+             AND timestamp_utc >= ? AND timestamp_utc < ?`,
+        )
+        .get(...q.serials, isoNoMs(startUtc), isoNoMs(endUtcExclusive)) as { n: number }
+    ).n;
+  }
+  return { ...computeStats(rows, q.from, q.to, q.groupBy, DISPLAY_TZ), suspectHidden };
 }
 
 export interface DayRecord {
