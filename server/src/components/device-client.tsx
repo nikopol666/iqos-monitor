@@ -83,26 +83,28 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
   }
 
   const v = snapshot?.values ?? {};
-  const rows: [string, React.ReactNode][] = [
-    [t.device.model, v.model ?? d.model ?? "—"],
-    [t.device.serial, <span key="s" className="font-mono">{d.serial}</span>],
-    [t.device.firmware, v.firmware_version ? <span key="f" title={String(v.firmware_raw ?? "")}>{String(v.firmware_version)}</span> : <span key="f" className="font-mono text-xs">{v.firmware_raw ?? "—"}</span>],
-    [t.device.battery, d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`],
-    [t.device.chargingLabel, d.charging == null ? "—" : d.charging ? t.common.yes : t.common.no],
-    [t.device.batteryTemp, typeof v.battery_temp_c === "number" ? `${v.battery_temp_c} °C` : "—"],
-    [t.device.brightnessLevel, d.brightness == null ? "—" : d.brightness === 0x64 ? t.overview.brightnessHigh : d.brightness === 0x1e ? t.overview.brightnessLow : String(d.brightness)],
-    [t.device.lifetimeSticks, fmt.integer(d.lifetime.sticks)],
-    [t.device.lifetimePuffs, fmt.integer(d.lifetime.puffs)],
-    [t.device.avgPuffs, d.lifetime.sticks && d.lifetime.puffs != null ? fmt.number(Math.round((d.lifetime.puffs / d.lifetime.sticks) * 100) / 100) : "—"],
-    [t.device.lifetimeHours, d.lifetime.seconds == null ? "—" : fmt.number(Math.round((d.lifetime.seconds / 3600) * 10) / 10)],
-    [t.device.stickState, d.connected ? (d.live?.stickState ?? "—") : (v.stick_state_code ?? "—")],
-    [t.device.errorCode, d.connected ? (d.live?.errorState ?? "—") : (v.error_state_code ?? "—")],
-    [t.device.sensor83, v.sensor_83_raw_value ?? "—"],
-    [t.device.sensor84, v.sensor_84_raw_value ?? "—"],
-    [t.device.flexpuff, onOff(v.flexpuff_enabled, snapshot?.statuses.flexpuff)],
-    [t.device.autostart, onOff(v.autostart_enabled, snapshot?.statuses.autostart)],
-    [t.device.pauseMode, onOff(v.pause_mode_enabled, snapshot?.statuses.pause_mode)],
+  type Tag = "verified" | "candidate" | "raw";
+  const rows: [string, React.ReactNode, Tag, string][] = [
+    [t.device.model, v.model ?? d.model ?? "—", "verified", t.device.srcApp],
+    [t.device.serial, <span key="s" className="font-mono">{d.serial}</span>, "verified", t.device.srcApp],
+    [t.device.firmware, v.firmware_version ? <span key="f" title={String(v.firmware_raw ?? "")}>{String(v.firmware_version)}</span> : <span key="f" className="font-mono text-xs">{v.firmware_raw ?? "—"}</span>, "verified", t.device.srcApp],
+    [t.device.battery, d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`, "verified", t.device.srcApp],
+    [t.device.chargingLabel, d.charging == null ? "—" : d.charging ? t.common.yes : t.common.no, "verified", t.device.srcUser],
+    [t.device.batteryTemp, typeof v.battery_temp_c === "number" ? `${v.battery_temp_c} °C` : "—", "candidate", t.device.srcIqosBar],
+    [t.device.brightnessLevel, d.brightness == null ? "—" : d.brightness === 0x64 ? t.overview.brightnessHigh : d.brightness === 0x1e ? t.overview.brightnessLow : String(d.brightness), "verified", t.device.srcCapture],
+    [t.device.lifetimeSticks, fmt.integer(d.lifetime.sticks), "verified", t.device.srcSession],
+    [t.device.lifetimePuffs, fmt.integer(d.lifetime.puffs), "verified", t.device.srcSession],
+    [t.device.avgPuffs, d.lifetime.sticks && d.lifetime.puffs != null ? fmt.number(Math.round((d.lifetime.puffs / d.lifetime.sticks) * 100) / 100) : "—", "verified", t.device.srcDerived],
+    [t.device.lifetimeHours, d.lifetime.seconds == null ? "—" : fmt.number(Math.round((d.lifetime.seconds / 3600) * 10) / 10), "candidate", t.device.srcIqosBar],
+    [t.device.errorCode, d.connected ? (d.live?.errorState ?? "—") : (v.error_state_code ?? "—"), "candidate", t.device.srcIqosBar],
+    [t.device.sensor83, v.sensor_83_raw_value ?? "—", "raw", t.device.srcIqosBar],
+    [t.device.sensor84, v.sensor_84_raw_value ?? "—", "raw", t.device.srcIqosBar],
+    [t.device.flexpuff, onOff(v.flexpuff_enabled, snapshot?.statuses.flexpuff), "verified", t.device.srcCapture],
+    [t.device.autostart, onOff(v.autostart_enabled, snapshot?.statuses.autostart), "verified", t.device.srcCapture],
+    [t.device.pauseMode, onOff(v.pause_mode_enabled, snapshot?.statuses.pause_mode), "raw", t.device.unsupportedUsb],
   ];
+  const tagClass: Record<Tag, string> = { verified: "bg-good/15 text-good", candidate: "bg-warning/20 text-text", raw: "bg-surface-2 text-muted" };
+  const tagLabel: Record<Tag, string> = { verified: t.device.tagVerified, candidate: t.device.tagCandidate, raw: t.device.tagRaw };
 
   function onOff(value: unknown, status: string | undefined): string {
     if (value === true) return t.common.yes;
@@ -139,13 +141,19 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
         <Card className="lg:col-span-2">
           <CardTitle right={snapshot ? <span className="text-xs text-muted">{t.device.lastSnapshot}: {fmt.dateTime(snapshot.collectedUtc)}</span> : null}>{t.device.diagnostics}</CardTitle>
           <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
-            {rows.map(([k, val]) => (
-              <div key={k} className="flex justify-between gap-3 border-b border-border py-1">
-                <dt className="text-text-2">{k}</dt>
+            {rows.map(([k, val, tag, source]) => (
+              <div key={k} className="flex items-center justify-between gap-3 border-b border-border py-1">
+                <dt className="flex items-center gap-2 text-text-2">
+                  {k}
+                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none ${tagClass[tag]}`} title={source}>
+                    {tagLabel[tag]}
+                  </span>
+                </dt>
                 <dd className="tabular text-right font-medium">{val}</dd>
               </div>
             ))}
           </dl>
+          <p className="mt-2 text-[11px] text-muted">{t.device.tagLegend}</p>
           {snapshot ? (
             <p className="mt-2 text-xs text-muted">
               brightness: {snapshot.statuses.brightness ?? "—"} · vibration: {snapshot.statuses.vibration ?? "—"} · FlexBattery: {snapshot.statuses.flexbattery ?? "—"}
