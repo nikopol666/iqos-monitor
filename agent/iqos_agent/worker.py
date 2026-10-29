@@ -30,6 +30,7 @@ log = logging.getLogger(__name__)
 
 ENUMERATE_INTERVAL = 2.0
 HEARTBEAT_INTERVAL = 5.0
+ARCHIVE_POLL_INTERVAL = 5.0  # while connected: look for new archive records this often
 UPLOAD_INTERVAL = 5.0
 MAX_LIVE_FAILURES = 5
 
@@ -97,6 +98,7 @@ class DeviceWorker(threading.Thread):
         self._last_upload = 0.0
         self._live_failures = 0
         self._next_index: Optional[int] = None
+        self._last_archive_poll = 0.0
         self._model: Optional[str] = None
 
     # -- jobs handed over by the manager ------------------------------------------------
@@ -153,6 +155,7 @@ class DeviceWorker(threading.Thread):
                         self._run_full_history(db, dev, job)
                     continue
                 self._live_tick(dev)
+                self._poll_archive(db, dev)
                 self._maybe_upload(db)
                 time.sleep(0.05)
         except Exception as exc:
@@ -193,6 +196,31 @@ class DeviceWorker(threading.Thread):
         self._set(sync_done=done, sync_total=total)
         self._live_tick(dev)
         self._maybe_upload(db)
+
+    def _poll_archive(self, db, dev) -> None:
+        """New archive records while the device stays plugged in (a stick smoked on
+        the cable, a button press): fetch them right away instead of at the next connect."""
+        now = time.monotonic()
+        if now - self._last_archive_poll < ARCHIVE_POLL_INTERVAL:
+            return
+        self._last_archive_poll = now
+        try:
+            nxt = dev.next_index()
+        except Exception as exc:
+            log.debug("%s archive poll failed: %s", self.serial, exc)
+            return
+        if self._next_index is not None and nxt <= self._next_index:
+            return
+        log.info("%s new archive records: next index %s -> %s", self.serial, self._next_index, nxt)
+        self._next_index = nxt
+        self._set(syncing=True, sync_label="recent")
+        try:
+            ok = sync_recent(db, self.info, delay=self.cfg.read_delay, months=self.cfg.recent_months,
+                             on_step=lambda idx, done, total: self._between_reads(db, dev, idx, done, total),
+                             skip_snapshot=True, dev=dev)
+        finally:
+            self._set(syncing=False, sync_total=None, sync_done=0)
+        self._upload(db, range_complete=ok)
 
     def _live_tick(self, dev, force: bool = False) -> None:
         now = time.monotonic()
