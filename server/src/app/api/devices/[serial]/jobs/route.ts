@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { badRequest, json, notFound, readJson, validSerial } from "@/lib/api";
-import { createJob, latestJob, updateJob } from "@/lib/ingest";
+import { createJob, latestJob, openFullHistoryJob, updateJob } from "@/lib/ingest";
 import { getDevice } from "@/lib/queries";
 import { getDb, schema } from "@/db";
 
@@ -28,7 +28,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/devices/[se
 export async function DELETE(_request: Request, ctx: RouteContext<"/api/devices/[serial]/jobs">) {
   const { serial } = await ctx.params;
   if (!validSerial(serial)) return badRequest("invalid serial");
-  const job = latestJob(serial);
-  if (!job || (job.status !== "queued" && job.status !== "running")) return notFound("no open job");
+  const job = openFullHistoryJob(serial);
+  if (!job) return notFound("no open job");
   return json({ ok: true, job: updateJob(job.id, { status: "cancelled" }) });
 }

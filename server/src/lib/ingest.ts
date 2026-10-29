@@ -341,6 +341,18 @@ export function updateJob(id: number, patch: JobUpdate): schema.AgentJob | undef
   return job;
 }
 
+/** The queued or running full-history job of a device, if any. */
+export function openFullHistoryJob(serial: string): schema.AgentJob | undefined {
+  const db = getDb();
+  return db
+    .select()
+    .from(schema.agentJobs)
+    .where(and(eq(schema.agentJobs.serial, serial), eq(schema.agentJobs.type, "full_history"), inArray(schema.agentJobs.status, ["queued", "running"])))
+    .orderBy(desc(schema.agentJobs.id))
+    .limit(1)
+    .get();
+}
+
 export function latestJob(serial: string): schema.AgentJob | undefined {
   const db = getDb();
   return db.select().from(schema.agentJobs).where(eq(schema.agentJobs.serial, serial)).orderBy(desc(schema.agentJobs.id)).limit(1).get();

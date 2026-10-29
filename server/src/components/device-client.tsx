@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Download, Usb, Cable, X } from "lucide-react";
 import type { DeviceOverview, EventPage } from "@/lib/queries";
 import type { LiveSample } from "@/db/schema";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import { Badge, Card, CardTitle, Notice } from "@/components/ui";
 import { DeviceImage } from "@/components/device-image";
+import { EtaTracker, formatEta } from "@/lib/eta";
 import { DeviceSettings } from "@/components/device-settings";
 import type { SettingsView } from "@/app/api/devices/[serial]/settings/route";
 
@@ -24,6 +25,8 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
   const [showInvalid, setShowInvalid] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [eta, setEta] = useState<number | null>(null);
+  const etaTracker = useRef(new EtaTracker());
 
   async function reloadRecords(invalid: boolean) {
     setShowInvalid(invalid);
@@ -44,7 +47,10 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
         const res = await fetch("/api/live", { cache: "no-store" });
         const data = (await res.json()) as { devices: DeviceOverview[] };
         const mine = data.devices.find((x) => x.serial === initial.serial);
-        if (active && mine) setD((prev) => (JSON.stringify(prev) === JSON.stringify(mine) ? prev : mine));
+        if (active && mine) {
+          setD((prev) => (JSON.stringify(prev) === JSON.stringify(mine) ? prev : mine));
+          setEta(etaTracker.current.update(mine.job?.done, mine.job?.total, mine.job?.status === "running"));
+        }
       } catch {
         /* keep last state */
       }
@@ -165,8 +171,13 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
           <div className="mt-3">
             {job ? (
               <div className="space-y-2">
-                <div className="text-sm">
-                  {job.status === "running" && job.total ? f(t.device.jobRunning, { done: job.done, total: job.total }) : job.status === "failed" ? f(t.device.jobFailed, { message: job.message ?? "" }) : t.device.jobQueued}
+                <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                  <span>{job.status === "running" && job.total ? f(t.device.jobRunning, { done: job.done, total: job.total }) : job.status === "failed" ? f(t.device.jobFailed, { message: job.message ?? "" }) : t.device.jobQueued}</span>
+                  {job.status === "running" && job.total ? (
+                    <span className="tabular text-xs text-text-2">
+                      {progressPct} %{eta != null ? ` · ${f(t.overview.etaLeft, { time: formatEta(eta) })}` : ""}
+                    </span>
+                  ) : null}
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
                   <div className="h-full bg-accent transition-all" style={{ width: `${progressPct}%` }} />

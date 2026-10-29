@@ -48,6 +48,7 @@ export const en = {
     todayPuffs: "{n} puffs",
     syncing: "Syncing {done}/{total}",
     syncingShort: "Transferring records",
+    etaLeft: "~{time} left",
     lastSeen: "Last seen {time}",
     detail: "Detail",
     agentOffline: "Agent not reporting",

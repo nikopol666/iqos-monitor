@@ -292,3 +292,9 @@ def mark_snapshots_uploaded(db, serial, up_to_id):
     db.execute("UPDATE device_snapshots SET uploaded_at_utc=? WHERE serial=? AND id<=? AND uploaded_at_utc IS NULL",
                (utc_now(),serial,int(up_to_id)))
     db.commit()
+
+
+def count_stored(db, serial, low, high):
+    """Number of archive IDs in [low, high] already stored with a good status."""
+    return db.execute("SELECT count(*) FROM events WHERE serial=? AND event_id BETWEEN ? AND ? AND status IN ('ok','empty')",
+                      (serial, int(low), int(high))).fetchone()[0]

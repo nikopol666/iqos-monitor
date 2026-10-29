@@ -1,7 +1,7 @@
 /** Read-side queries used by pages and the web API. */
 import { and, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { getDb, getSqlite, schema } from "@/db";
-import { isLiveConnected, latestJob } from "@/lib/ingest";
+import { isLiveConnected, openFullHistoryJob } from "@/lib/ingest";
 import { computeStats, type GroupBy, type StatRow, type StatsResult } from "@/lib/stats";
 import { localDayRangeUtc, todayKey, DISPLAY_TZ } from "@/lib/time";
 import { deviceLabel } from "@/lib/variants";
@@ -79,7 +79,7 @@ export function deviceOverview(device: schema.Device, siblings: schema.Device[] 
   const snap = latestSnapshot(device.serial);
   const values = snap ? (JSON.parse(snap.valuesJson) as Record<string, number | boolean | null>) : {};
   const connected = isLiveConnected(live);
-  const job = latestJob(device.serial);
+  const job = openFullHistoryJob(device.serial);
   const extra = (live?.extraJson ? JSON.parse(live.extraJson) : {}) as { charging?: boolean | null; brightness_level?: number | null };
   let sync: DeviceOverview["sync"] = null;
   if (connected) {

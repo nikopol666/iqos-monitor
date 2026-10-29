@@ -91,6 +91,9 @@ def sync_full(db, info, desired=None, delay=0.10, device_factory=IQOSDevice,
         bottom = prior_next if initial_complete and prior_next is not None else 0
         start = next_index - 1
         todo = max(0, start - bottom + 1)
+        # Progress is reported against what this run still has to read, not the whole archive.
+        from iqos_agent.storage import count_stored
+        remaining = max(0, todo - count_stored(db, serial, bottom, start)) if todo else 0
         if initial_complete:
             print(f'Prubezna synchronizace: nove indexy {bottom} az {start}', flush=True)
         else:
@@ -109,7 +112,7 @@ def sync_full(db, info, desired=None, delay=0.10, device_factory=IQOSDevice,
             if get_status(db, serial, idx) in GOOD:
                 skipped += 1
                 if on_step is not None and (skipped % 50 == 0):
-                    on_step(idx, processed + skipped, todo)
+                    on_step(idx, processed, remaining)
                 continue
             if desired is not None and processed >= desired:
                 completed_range = False
@@ -146,7 +149,7 @@ def sync_full(db, info, desired=None, delay=0.10, device_factory=IQOSDevice,
                 break
             time.sleep(delay)
             if on_step is not None:
-                on_step(idx, processed + skipped, todo)
+                on_step(idx, processed, remaining)
 
         # An error for a scanned ID means the range is not yet fully archived;
         # keep the old boundary so a new run retries it (and any missed IDs).

@@ -1,18 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { BatteryCharging, BatteryMedium, Cable, Sun, Usb } from "lucide-react";
 import type { DeviceOverview } from "@/lib/queries";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import { Badge, Empty } from "@/components/ui";
 import { DeviceImage } from "@/components/device-image";
 import { colorCss } from "@/lib/palette";
+import { EtaTracker, formatEta } from "@/lib/eta";
 
 export function OverviewClient({ initial, middle }: { initial: DeviceOverview[]; middle?: React.ReactNode }) {
   const { t } = useI18n();
   const [devices, setDevices] = useState(initial);
   const [stale, setStale] = useState(false);
+  const [etas, setEtas] = useState<Record<string, number | null>>({});
+  const trackers = useRef(new Map<string, EtaTracker>());
 
   useEffect(() => {
     let active = true;
@@ -29,6 +32,14 @@ export function OverviewClient({ initial, middle }: { initial: DeviceOverview[];
           last = next;
           setDevices(data.devices);
         }
+        const nextEtas: Record<string, number | null> = {};
+        for (const d of data.devices) {
+          let tr = trackers.current.get(d.serial);
+          if (!tr) trackers.current.set(d.serial, (tr = new EtaTracker()));
+          const e = tr.update(d.sync?.done, d.sync?.total, !!d.sync?.total);
+          if (e != null) nextEtas[d.serial] = e;
+        }
+        setEtas((prev) => (JSON.stringify(prev) === JSON.stringify(nextEtas) ? prev : nextEtas));
         setStale(false);
       } catch {
         if (active) setStale(true);
@@ -51,7 +62,7 @@ export function OverviewClient({ initial, middle }: { initial: DeviceOverview[];
           <h1 className="text-xl font-semibold">{t.overview.connectedNow}</h1>
           <div className="grid gap-4 md:grid-cols-2">
             {connected.map((d) => (
-              <DeviceCard key={d.serial} d={d} />
+              <DeviceCard key={d.serial} d={d} eta={etas[d.serial] ?? null} />
             ))}
           </div>
         </section>
@@ -61,7 +72,7 @@ export function OverviewClient({ initial, middle }: { initial: DeviceOverview[];
         <h2 className="text-lg font-semibold">{t.overview.allDevices}</h2>
         <div className="grid gap-4 md:grid-cols-2">
           {devices.map((d) => (
-            <DeviceCard key={d.serial} d={d} />
+            <DeviceCard key={d.serial} d={d} eta={etas[d.serial] ?? null} />
           ))}
         </div>
       </section>
@@ -69,7 +80,7 @@ export function OverviewClient({ initial, middle }: { initial: DeviceOverview[];
   );
 }
 
-const DeviceCard = memo(function DeviceCard({ d }: { d: DeviceOverview }) {
+const DeviceCard = memo(function DeviceCard({ d, eta }: { d: DeviceOverview; eta: number | null }) {
   const { t, f } = useI18n();
   const fmt = useFormat();
   const brightness = d.brightness == null ? "—" : d.brightness === 0x64 ? t.overview.brightnessHigh : d.brightness === 0x1e ? t.overview.brightnessLow : `${d.brightness}`;
@@ -138,7 +149,11 @@ const DeviceCard = memo(function DeviceCard({ d }: { d: DeviceOverview }) {
           </span>
         ) : null}
         {d.sync ? (
-          <span className="text-accent">{d.sync.total ? f(t.overview.syncing, { done: d.sync.done, total: d.sync.total }) : `${t.overview.syncingShort} · ${d.sync.done}`}</span>
+          <span className="text-accent">
+            {d.sync.total ? f(t.overview.syncing, { done: d.sync.done, total: d.sync.total }) : `${t.overview.syncingShort} · ${d.sync.done}`}
+            {d.sync.total ? ` · ${Math.min(100, Math.round((d.sync.done / d.sync.total) * 100))} %` : ""}
+            {eta != null ? ` · ${f(t.overview.etaLeft, { time: formatEta(eta) })}` : ""}
+          </span>
         ) : d.job ? (
           <span className="text-accent">{t.device.jobQueued}</span>
         ) : null}
