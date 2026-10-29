@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Usb, Cable, X } from "lucide-react";
+import { ChevronRight, Download, Usb, Cable, X } from "lucide-react";
 import type { DeviceOverview, EventPage } from "@/lib/queries";
 import type { LiveSample } from "@/db/schema";
 import { useFormat, useI18n } from "@/lib/i18n/client";
@@ -189,23 +189,21 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
 
       <DeviceSettings serial={d.serial} connected={d.connected} initial={settings} />
 
-      <Card>
-        <CardTitle
-          right={
-            <span className="flex items-center gap-3 text-xs text-muted">
-              <label className="flex items-center gap-1.5">
-                <input type="checkbox" checked={showInvalid} onChange={(e) => reloadRecords(e.target.checked)} />
-                {t.device.showInvalid}
-                {!showInvalid && totalAll > page.total ? ` (${f(t.device.invalidCount, { n: fmt.integer(totalAll - page.total) })})` : ""}
-              </label>
-              <span>
-                {fmt.integer(page.items.length)} / {fmt.integer(page.total)}
-              </span>
-            </span>
-          }
-        >
-          {t.device.records}
-        </CardTitle>
+      <details className="ui-card group p-4 sm:p-5">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-2">
+            <ChevronRight size={14} className="mr-1 inline transition-transform group-open:rotate-90" aria-hidden />
+            {t.device.records} · {fmt.integer(page.total)}
+          </h2>
+          <span className="flex items-center gap-3 text-xs text-muted" onClick={(e) => e.stopPropagation()}>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" checked={showInvalid} onChange={(e) => reloadRecords(e.target.checked)} />
+              {t.device.showInvalid}
+              {!showInvalid && totalAll > page.total ? ` (${f(t.device.invalidCount, { n: fmt.integer(totalAll - page.total) })})` : ""}
+            </label>
+          </span>
+        </summary>
+        <div className="mt-3">
         {page.items.length === 0 ? (
           <Notice tone="info">{t.device.noRecords}</Notice>
         ) : (
@@ -256,11 +254,16 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
             {t.device.showMore}
           </button>
         ) : null}
-      </Card>
+        </div>
+      </details>
 
       {samples.length ? (
-        <Card>
-          <CardTitle>{t.device.liveSamples}</CardTitle>
+        <details className="ui-card group p-4 sm:p-5">
+          <summary className="cursor-pointer list-none text-sm font-semibold uppercase tracking-wide text-text-2">
+            <ChevronRight size={14} className="mr-1 inline transition-transform group-open:rotate-90" aria-hidden />
+            {t.device.liveSamples} · {samples.length}
+          </summary>
+          <div className="mt-3">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs text-text-2">
@@ -285,7 +288,8 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
               </tbody>
             </table>
           </div>
-        </Card>
+          </div>
+        </details>
       ) : null}
     </div>
   );
