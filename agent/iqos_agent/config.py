@@ -17,19 +17,12 @@ def config_dir() -> Path:
     return path
 
 
-def default_db_path() -> str:
-    # Reuse the IQOS-History database so already downloaded archives are
-    # uploaded without a separate migration step.
-    return str(Path.home() / "Documents" / "IQOS History" / "history.sqlite3")
-
-
 @dataclass
 class Config:
     server_url: str = ""
     api_key: str = ""
     agent_name: str = field(default_factory=lambda: socket.gethostname() or "agent")
     language: str = "auto"          # auto | en | cs
-    db_path: str = field(default_factory=default_db_path)
     live_interval: float = 1.0      # seconds between live reads while connected
     recent_months: int = 3          # first sync window for a new device
     read_delay: float = 0.10        # minimum pause between archive reads

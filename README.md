@@ -49,25 +49,13 @@ docker compose up -d
 Data lives in the `iqos-data` volume (`/data/iqos.sqlite3`). To build on the host instead of pulling:
 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
 
-### Moving an existing database to the server
+### A new or restored server
 
-The agent only re-sends records the server has not acknowledged, so a fresh server would
-start empty. Copy the development database (users, devices, colours, agent keys and all
-records) into the volume **before** the first start, or stop the container first:
-
-```bash
-docker compose stop                                   # if it already runs
-docker run --rm -v "$(pwd)":/src -v iqos_iqos-data:/data alpine   sh -c "cp /src/iqos.sqlite3 /data/iqos.sqlite3 && rm -f /data/iqos.sqlite3-wal /data/iqos.sqlite3-shm && chown 1000:1000 /data/iqos.sqlite3"
-docker compose up -d
-```
-
-Volume name = `<compose project>_iqos-data`; check with `docker volume ls`. The copy must be a
-checkpointed SQLite file (`PRAGMA wal_checkpoint(TRUNCATE)` or `.backup`), not a live file with
-a `-wal` sidecar. The container fixes ownership of `/data` itself at start (entrypoint runs as
-root, the server as uid 1000 `node`), so a root-owned volume or bind mount is fine.
-
-Then on each PC: tray icon → Settings → server URL `http://<server-ip>:3000`, Test, Save.
-The existing API key keeps working because the agents table moved with the database.
+Nothing has to be copied. The agent asks the server which archive IDs it lacks
+and reads them from the device again (last 3 months on first contact; the whole
+archive via *Download full history* on the device page). Users, device names,
+finishes and colours are the only thing a fresh database does not get back:
+set them again in *Settings*.
 
 ## Agent
 
@@ -87,9 +75,11 @@ console; requires Python 3 and `pip install -r requirements.txt`). The
 "Start with Windows" switch in the tray menu registers that launcher.
 
 Settings are stored in `%APPDATA%\IQOS Agent\config.json` (server address,
-API key, language, autostart). The local SQLite buffer defaults to
-`Documents\IQOS History\history.sqlite3`, so archives downloaded by the old
-tooling are uploaded automatically. Log: `%APPDATA%\IQOS Agent\agent.log`.
+API key, language, autostart). The agent keeps **no database**: the server
+answers which archive IDs it still lacks (`GET /api/agent/devices/{serial}/sync`),
+the agent reads exactly those from the device and posts them in batches. If the
+server is unreachable the sync stops and the next attempt reads again; nothing
+is buffered on the PC. Log: `%APPDATA%\IQOS Agent\agent.log`.
 
 Behaviour: any IQOS (USB `2759:0003`) is accepted and registered on the server
 as unassigned. On connect the agent takes a diagnostics snapshot, syncs the last

@@ -107,10 +107,14 @@ describe("ingestEvents", () => {
     expect(dev.full_history_complete).toBe(1);
   });
 
-  it("reports stored record counts per serial", () => {
-    const counts = ingest.eventCounts([serial, "UNKNOWN0000000"]);
-    expect(counts.UNKNOWN0000000).toBe(0);
-    expect(counts[serial]).toBeGreaterThan(0);
+  it("lists the archive ids the server still lacks", () => {
+    const all = ingest.missingIds("UNKNOWN0000000", 0, 4);
+    expect(all).toEqual([0, 1, 2, 3, 4]);
+    const stored = getSqlite().prepare("SELECT event_id FROM events WHERE serial = ? AND status IN ('ok','empty') ORDER BY event_id").all(serial) as { event_id: number }[];
+    const ids = stored.map((r) => r.event_id);
+    const missing = ingest.missingIds(serial, 0, Math.max(...ids));
+    for (const id of ids) expect(missing).not.toContain(id);
+    expect(missing.length + ids.length).toBe(Math.max(...ids) + 1);
   });
 
   it("a cancelled job is not revived by the agent's progress report", () => {

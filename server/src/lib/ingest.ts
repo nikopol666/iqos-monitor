@@ -346,18 +346,17 @@ export function updateJob(id: number, patch: JobUpdate): schema.AgentJob | undef
   return job;
 }
 
-/** Number of stored archive records per serial (agents compare it with their local copy). */
-export function eventCounts(serials: string[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  if (!serials.length) return out;
-  const rows = getDb()
-    .select({ serial: schema.events.serial, n: sql<number>`count(*)` })
-    .from(schema.events)
-    .where(inArray(schema.events.serial, serials))
-    .groupBy(schema.events.serial)
-    .all();
-  for (const s of serials) out[s] = 0;
-  for (const r of rows) out[r.serial] = Number(r.n);
+/**
+ * Archive IDs in [low, high] the server does not hold as 'ok' or 'empty'. The
+ * agent keeps no database: this is how it learns what to read from the device.
+ */
+export function missingIds(serial: string, low: number, high: number): number[] {
+  const rows = getSqlite()
+    .prepare("SELECT event_id FROM events WHERE serial = ? AND status IN ('ok','empty') AND event_id BETWEEN ? AND ?")
+    .all(serial, low, high) as { event_id: number }[];
+  const stored = new Set(rows.map((r) => r.event_id));
+  const out: number[] = [];
+  for (let i = low; i <= high; i++) if (!stored.has(i)) out.push(i);
   return out;
 }
 

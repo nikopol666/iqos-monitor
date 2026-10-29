@@ -8,7 +8,7 @@ a = Analysis(
     ["iqos_agent/__main__.py"],
     pathex=["."],
     binaries=[],
-    datas=[("iqos_agent/known_observations.json", "iqos_agent")],
+    datas=[],
     hiddenimports=collect_submodules("pystray") + ["PIL.ImageDraw", "tkinter", "tkinter.ttk", "winreg"],
     hookspath=[],
     runtime_hooks=[],

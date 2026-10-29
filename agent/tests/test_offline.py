@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 from iqos_agent.core import (FrameCollector, check_crc, extract_datetime,
                        IQOSDevice, METADATA_REQUEST, history_request, Reply)
-from iqos_agent.storage import connect, import_json_files, get_status
 
 ROOT = Path(__file__).resolve().parents[2] / 'test-vectors'
 
@@ -49,14 +48,4 @@ assert check_crc(f),f.hex()
 assert int.from_bytes(f[10:13],'little')==10488
 assert METADATA_REQUEST.hex()=='c01002010175d6'
 
-# Import existing experimental JSON captures into fresh SQLite, with no USB.
-from tempfile import TemporaryDirectory
-with TemporaryDirectory(ignore_cleanup_errors=True) as temp:
-    db=connect(Path(temp)/'test.sqlite3')
-    files=[ROOT/'modra_correct_20261026_203051.json',ROOT/'fialova_history_sample_20261026_195811.json']
-    stats=import_json_files(db,files)
-    assert stats['events']==11
-    assert get_status(db,'DEVICEB0000002',10487)=='ok'
-    assert get_status(db,'DEVICEA0000001',900)=='ok'
-    db.close()
 print('OFFLINE TESTS PASSED')

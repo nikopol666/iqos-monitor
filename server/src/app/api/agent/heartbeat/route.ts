@@ -1,7 +1,7 @@
 import { inArray } from "drizzle-orm";
 import { authenticateAgent, touchAgent, unauthorized } from "@/lib/auth";
 import { badRequest, json, readJson, validSerial } from "@/lib/api";
-import { ensureDevice, eventCounts, pendingJobs, updateLive } from "@/lib/ingest";
+import { ensureDevice, pendingJobs, updateLive } from "@/lib/ingest";
 import { getDb, schema } from "@/db";
 import { deviceLabel } from "@/lib/variants";
 
@@ -12,9 +12,7 @@ interface HeartbeatBody {
 
 /**
  * Agent check-in. Registers unknown serials, returns per-device sync state
- * (incl. how many records the server holds) and any queued jobs for the
- * connected devices. Devices listed without `connected` are the agent's
- * offline devices: their live state is left alone.
+ * and any queued jobs for the connected devices.
  */
 export async function POST(request: Request) {
   const identity = authenticateAgent(request);
@@ -33,13 +31,10 @@ export async function POST(request: Request) {
   const db = getDb();
   const rows = serials.length ? db.select().from(schema.devices).where(inArray(schema.devices.serial, serials)).all() : [];
   const allDevices = db.select().from(schema.devices).all();
-  const counts = eventCounts(serials);
   const devices: Record<string, unknown> = {};
   for (const r of rows) {
     devices[r.serial] = {
       name: deviceLabel(r.name, r.variant, r.serial, allDevices),
-      // Lets an agent notice a fresh or restored server and re-send its local archive.
-      event_count: counts[r.serial] ?? 0,
       acked_next_index: r.ackedNextIndex,
       lowest_stored_index: r.lowestStoredIndex,
       full_history_complete: !!r.fullHistoryComplete,
