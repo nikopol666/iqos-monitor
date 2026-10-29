@@ -8,7 +8,8 @@ import type { ShortTermStats } from "@/lib/shortterm";
 import { colorCss } from "@/lib/palette";
 import { Card, CardTitle, Stat } from "@/components/ui";
 
-type Payload = ShortTermStats & { devices: { serial: string; name: string; color: string }[] };
+export type ShortTermPayload = ShortTermStats & { devices: { serial: string; name: string; color: string }[] };
+type Payload = ShortTermPayload;
 type Row = Record<string, string | number>;
 
 function delta(now: number, before: number): string {
@@ -17,18 +18,19 @@ function delta(now: number, before: number): string {
   return pct === 0 ? "±0 %" : `${pct > 0 ? "+" : ""}${pct} %`;
 }
 
-/** Today / this week at a glance; refreshes every minute. */
-export function ShortTermClient({ initial }: { initial: Payload }) {
+/** Today / this week at a glance for one user (or all); refreshes every minute. */
+export function ShortTermClient({ initial, userId }: { initial: Payload | null; userId: number | "all" }) {
   const { t, f } = useI18n();
   const fmt = useFormat();
   const [data, setData] = useState(initial);
 
   useEffect(() => {
-    let last = JSON.stringify(initial);
-    const id = setInterval(async () => {
+    let active = true;
+    let last = initial ? JSON.stringify(initial) : "";
+    const load = async () => {
       try {
-        const res = await fetch("/api/shortterm", { cache: "no-store" });
-        if (!res.ok) return;
+        const res = await fetch(`/api/shortterm?user=${userId}`, { cache: "no-store" });
+        if (!res.ok || !active) return;
         const next = (await res.json()) as Payload;
         const json = JSON.stringify(next);
         if (json !== last) {
@@ -38,17 +40,22 @@ export function ShortTermClient({ initial }: { initial: Payload }) {
       } catch {
         /* keep last */
       }
-    }, 60_000);
-    return () => clearInterval(id);
-  }, [initial]);
+    };
+    if (!initial) void load();
+    const id = setInterval(load, 60_000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [initial, userId]);
 
   const shortDateKey = fmt.shortDateKey;
   const dateKey = fmt.dateKey;
   const rows = useMemo<Row[]>(
     () =>
-      data.days.map((d) => {
+      (data?.days ?? []).map((d) => {
         const row: Row = { day: d.day, label: shortDateKey(d.day), full: dateKey(d.day), sessions: d.sessions, puffs: d.puffs };
-        for (const dev of data.devices) {
+        for (const dev of data?.devices ?? []) {
           const ps = d.perSerial[dev.serial];
           row[`s:${dev.serial}`] = ps?.sessions ?? 0;
           row[`p:${dev.serial}`] = ps && ps.sessions ? Math.round((ps.puffs / ps.sessions) * 10) / 10 : 0;
@@ -57,6 +64,7 @@ export function ShortTermClient({ initial }: { initial: Payload }) {
       }),
     [data, shortDateKey, dateKey],
   );
+  if (!data) return null;
   const multi = data.devices.length > 1;
   const tot = data.totals;
 

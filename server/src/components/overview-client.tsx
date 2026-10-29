@@ -2,17 +2,33 @@
 
 import Link from "next/link";
 import { memo, useEffect, useRef, useState } from "react";
-import { BatteryCharging, BatteryMedium, Cable, Sun, Usb } from "lucide-react";
+import { BatteryCharging, BatteryMedium, Cable, Usb } from "lucide-react";
 import type { DeviceOverview } from "@/lib/queries";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import { Badge, Empty } from "@/components/ui";
 import { DeviceImage } from "@/components/device-image";
+import { ShortTermClient, type ShortTermPayload } from "@/components/shortterm-client";
 import { colorCss } from "@/lib/palette";
 import { EtaTracker, formatEta } from "@/lib/eta";
 
-export function OverviewClient({ initial, middle }: { initial: DeviceOverview[]; middle?: React.ReactNode }) {
+export const OVERVIEW_USER_COOKIE = "overview_user";
+export type OverviewUser = number | "all";
+
+interface UserOpt {
+  id: number;
+  name: string;
+  color: string;
+}
+
+/**
+ * One person's overview: their connected devices, their week, their devices.
+ * The chosen user is kept in a cookie so the next visit (and the server
+ * render) starts on the same person. "All" exists for unassigned devices.
+ */
+export function OverviewClient({ initial, users, initialUser, week }: { initial: DeviceOverview[]; users: UserOpt[]; initialUser: OverviewUser; week: ShortTermPayload | null }) {
   const { t } = useI18n();
   const [devices, setDevices] = useState(initial);
+  const [userId, setUserId] = useState<OverviewUser>(initialUser);
   const [stale, setStale] = useState(false);
   const [etas, setEtas] = useState<Record<string, number | null>>({});
   const trackers = useRef(new Map<string, EtaTracker>());
@@ -52,11 +68,43 @@ export function OverviewClient({ initial, middle }: { initial: DeviceOverview[];
     };
   }, [initial]);
 
+  function choose(next: OverviewUser) {
+    setUserId(next);
+    rememberUser(next);
+  }
+
   if (!devices.length) return <Empty>{t.overview.empty}</Empty>;
-  const connected = devices.filter((d) => d.connected);
+  const unassigned = devices.some((d) => !d.user);
+  const shown = userId === "all" ? devices : devices.filter((d) => d.user?.id === userId);
+  const connected = shown.filter((d) => d.connected);
+  const chips: { key: OverviewUser; label: string; color: string | null }[] = [
+    ...users.map((u) => ({ key: u.id as OverviewUser, label: u.name, color: u.color })),
+    ...(users.length > 1 || unassigned ? [{ key: "all" as OverviewUser, label: t.common.all, color: null }] : []),
+  ];
 
   return (
     <div className={`space-y-6 transition-opacity ${stale ? "opacity-60" : ""}`}>
+      {chips.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-text-2">{t.overview.showFor}</span>
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t.overview.showFor}>
+            {chips.map((c) => (
+              <button
+                key={String(c.key)}
+                type="button"
+                role="radio"
+                aria-checked={userId === c.key}
+                onClick={() => choose(c.key)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors ${userId === c.key ? "border-accent bg-accent text-accent-ink" : "border-border bg-surface hover:border-accent"}`}
+              >
+                {c.color ? <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: c.color }} aria-hidden /> : null}
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {!shown.length ? <Empty>{t.overview.empty}</Empty> : null}
       {connected.length ? (
         <section className="space-y-3">
           <h1 className="text-xl font-semibold">{t.overview.connectedNow}</h1>
@@ -67,23 +115,47 @@ export function OverviewClient({ initial, middle }: { initial: DeviceOverview[];
           </div>
         </section>
       ) : null}
-      {middle}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">{t.overview.allDevices}</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {devices.map((d) => (
-            <DeviceCard key={d.serial} d={d} eta={etas[d.serial] ?? null} />
-          ))}
-        </div>
-      </section>
+      {shown.length ? <ShortTermClient key={String(userId)} initial={userId === initialUser ? week : null} userId={userId} /> : null}
+      {shown.length ? (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">{t.overview.allDevices}</h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            {shown.map((d) => (
+              <DeviceCard key={d.serial} d={d} eta={etas[d.serial] ?? null} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
+}
+
+/** Cookie so the server renders the same person next time. */
+function rememberUser(next: OverviewUser): void {
+  try {
+    document.cookie = `${OVERVIEW_USER_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+  } catch {
+    /* cookie blocked: the choice lasts for this page only */
+  }
 }
 
 const DeviceCard = memo(function DeviceCard({ d, eta }: { d: DeviceOverview; eta: number | null }) {
   const { t, f } = useI18n();
   const fmt = useFormat();
   const brightness = d.brightness == null ? "—" : d.brightness === 0x64 ? t.overview.brightnessHigh : d.brightness === 0x1e ? t.overview.brightnessLow : `${d.brightness}`;
+  const perStick = d.today.sessions ? fmt.number(Math.round((d.today.puffs / d.today.sessions) * 10) / 10) : "—";
+  const tiles = (
+    <>
+      <Metric
+        label={d.connected && d.charging != null ? (d.charging ? t.overview.charging : t.overview.charged) : t.overview.battery}
+        value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
+        icon={d.connected && d.charging ? <BatteryCharging size={16} aria-hidden className="anim-bolt text-good" /> : <BatteryMedium size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
+      />
+      <Metric label={t.overview.sticksToday} value={fmt.integer(d.today.sessions)} />
+      <Metric label={t.overview.puffsToday} value={fmt.integer(d.today.puffs)} />
+      <Metric label={t.overview.puffsPerStickToday} value={perStick} />
+    </>
+  );
   return (
     <Link
       href={`/devices/${d.serial}`}
@@ -120,39 +192,19 @@ const DeviceCard = memo(function DeviceCard({ d, eta }: { d: DeviceOverview; eta
               </Badge>
             )}
           </div>
-
-          <div className="mt-3 hidden grid-cols-2 gap-2 text-sm sm:grid">
-            <Metric
-              label={d.connected && d.charging != null ? (d.charging ? t.overview.charging : t.overview.charged) : t.overview.battery}
-              value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
-              icon={d.connected && d.charging ? <BatteryCharging size={16} aria-hidden className="anim-bolt text-good" /> : <BatteryMedium size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
-            />
-            <Metric label={t.overview.brightness} value={brightness} icon={<Sun size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />} />
-            <Metric label={t.overview.lifetimeSticks} value={fmt.integer(d.lifetime.sticks)} />
-            <Metric label={t.overview.lifetimePuffs} value={fmt.integer(d.lifetime.puffs)} />
-          </div>
+          <div className="mt-3 hidden grid-cols-2 gap-2 text-sm sm:grid">{tiles}</div>
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:hidden">
-        <Metric
-          label={d.connected && d.charging != null ? (d.charging ? t.overview.charging : t.overview.charged) : t.overview.battery}
-          value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
-          icon={d.connected && d.charging ? <BatteryCharging size={16} aria-hidden className="anim-bolt text-good" /> : <BatteryMedium size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
-        />
-        <Metric label={t.overview.brightness} value={brightness} icon={<Sun size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />} />
-        <Metric label={t.overview.lifetimeSticks} value={fmt.integer(d.lifetime.sticks)} />
-        <Metric label={t.overview.lifetimePuffs} value={fmt.integer(d.lifetime.puffs)} />
-      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:hidden">{tiles}</div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-2">
         <span>
-          {t.overview.today}: {f(t.overview.todaySticks, { n: fmt.integer(d.today.sessions) })} · {f(t.overview.todayPuffs, { n: fmt.integer(d.today.puffs) })}
+          {t.overview.lifetime}: {f(t.overview.todaySticks, { n: fmt.integer(d.lifetime.sticks) })} · {f(t.overview.todayPuffs, { n: fmt.integer(d.lifetime.puffs) })}
+          {d.lifetime.seconds != null ? ` · ${fmt.number(Math.round((d.lifetime.seconds / 3600) * 10) / 10)} h` : ""}
         </span>
-        {d.lifetime.seconds != null ? (
-          <span>
-            {t.overview.lifetimeHours}: {fmt.number(Math.round((d.lifetime.seconds / 3600) * 10) / 10)} h
-          </span>
-        ) : null}
+        <span>
+          {t.overview.brightness}: {brightness}
+        </span>
         {!d.connected ? (
           <span className="text-muted">
             {d.live?.disconnectedUtc ? f(t.overview.offlineSince, { time: fmt.dateTime(d.live.disconnectedUtc) }) : d.lastSeenUtc ? f(t.overview.lastSeen, { time: fmt.dateTime(d.lastSeenUtc) }) : t.overview.neverConnected}
