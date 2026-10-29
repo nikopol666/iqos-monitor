@@ -346,6 +346,21 @@ export function updateJob(id: number, patch: JobUpdate): schema.AgentJob | undef
   return job;
 }
 
+/** Number of stored archive records per serial (agents compare it with their local copy). */
+export function eventCounts(serials: string[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!serials.length) return out;
+  const rows = getDb()
+    .select({ serial: schema.events.serial, n: sql<number>`count(*)` })
+    .from(schema.events)
+    .where(inArray(schema.events.serial, serials))
+    .groupBy(schema.events.serial)
+    .all();
+  for (const s of serials) out[s] = 0;
+  for (const r of rows) out[r.serial] = Number(r.n);
+  return out;
+}
+
 /** The queued or running full-history job of a device, if any. */
 export function openFullHistoryJob(serial: string): schema.AgentJob | undefined {
   const db = getDb();

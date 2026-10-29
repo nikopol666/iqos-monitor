@@ -277,6 +277,19 @@ def mark_uploaded(db, serial, event_ids):
     db.commit()
 
 
+def uploaded_count(db, serial):
+    """Events the server has already acknowledged."""
+    return db.execute("SELECT count(*) FROM events WHERE serial=? AND uploaded_at_utc IS NOT NULL",(serial,)).fetchone()[0]
+
+
+def reset_uploaded(db, serial):
+    """Forget the server's acknowledgements so everything local is sent again
+    (used when the server turns out to hold fewer records than we already sent)."""
+    db.execute("UPDATE events SET uploaded_at_utc=NULL WHERE serial=?",(serial,))
+    db.execute("UPDATE device_snapshots SET uploaded_at_utc=NULL WHERE serial=?",(serial,))
+    db.commit()
+
+
 def pending_upload_count(db, serial):
     return db.execute("SELECT count(*) FROM events WHERE serial=? AND uploaded_at_utc IS NULL",(serial,)).fetchone()[0]
 

@@ -23,6 +23,7 @@ from iqos_agent.live import read_live
 from iqos_agent.recent import sync_recent
 from iqos_agent.settings import SettingError, apply_setting
 from iqos_agent.storage import (connect, import_observations, pending_upload_count,
+                                reset_uploaded, uploaded_count,
                                 save_device, save_snapshot)
 from iqos_agent.uploader import ServerClient, ServerError, flush_pending, flush_snapshot
 
@@ -370,6 +371,7 @@ class AgentManager(threading.Thread):
         self.workers: dict[str, tuple[DeviceWorker, threading.Event]] = {}
         self.quit_event = threading.Event()
         self._last_heartbeat = 0.0
+        self._resent: set[str] = set()
         self._initial_flush_done = False
         self.apply_config(cfg)
 
@@ -429,6 +431,39 @@ class AgentManager(threading.Thread):
         if self.client and time.monotonic() - self._last_heartbeat >= HEARTBEAT_INTERVAL:
             self._heartbeat(present)
 
+    def _known_serials(self) -> list[str]:
+        try:
+            db = connect(self.cfg.db_path)
+            try:
+                return [row[0] for row in db.execute("SELECT serial FROM devices")]
+            finally:
+                db.close()
+        except Exception:
+            return []
+
+    def _check_server_archive(self, devices: dict) -> None:
+        """A fresh or restored server (new volume, restored backup) holds fewer records
+        than we already sent it: forget the acknowledgements once per run so the whole
+        local archive is uploaded again. Nothing is read from the device for this."""
+        try:
+            db = connect(self.cfg.db_path)
+        except Exception:
+            return
+        try:
+            for serial, data in devices.items():
+                if serial in self._resent or not isinstance(data.get("event_count"), int):
+                    continue
+                ours = uploaded_count(db, serial)
+                theirs = data["event_count"]
+                if ours and theirs < ours:
+                    log.warning("%s: server holds %d records, we already sent %d; re-sending the local archive",
+                                serial, theirs, ours)
+                    reset_uploaded(db, serial)
+                    self._resent.add(serial)
+                    self._initial_flush_done = False  # offline devices go through _flush_offline
+        finally:
+            db.close()
+
     def _flush_offline(self, db) -> None:
         """Push archives stored locally for devices that are not plugged in."""
         self._initial_flush_done = True
@@ -452,12 +487,18 @@ class AgentManager(threading.Thread):
     def _heartbeat(self, present: dict) -> None:
         self._last_heartbeat = time.monotonic()
         devices = [{"serial": s, "connected": True} for s in present]
+        # Offline devices we hold archives for: listed without "connected" so the
+        # server leaves their live state alone but tells us how much it stores.
+        for serial in self._known_serials():
+            if serial not in present:
+                devices.append({"serial": serial})
         try:
             reply = self.client.heartbeat(devices)
         except ServerError as exc:
             self.status.update(lambda s: (setattr(s, "server_ok", False), setattr(s, "server_error", str(exc))))
             return
         self.status.update(lambda s: (setattr(s, "server_ok", True), setattr(s, "server_error", None)))
+        self._check_server_archive(reply.get("devices") or {})
         by_serial: dict[str, list[dict]] = {}
         for job in reply.get("jobs", []):
             by_serial.setdefault(job["serial"], []).append(job)

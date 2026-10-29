@@ -107,6 +107,12 @@ describe("ingestEvents", () => {
     expect(dev.full_history_complete).toBe(1);
   });
 
+  it("reports stored record counts per serial", () => {
+    const counts = ingest.eventCounts([serial, "UNKNOWN0000000"]);
+    expect(counts.UNKNOWN0000000).toBe(0);
+    expect(counts[serial]).toBeGreaterThan(0);
+  });
+
   it("a cancelled job is not revived by the agent's progress report", () => {
     const c = ingest.createJob(serial, "full_history");
     ingest.updateJob(c.id, { status: "cancelled" });
