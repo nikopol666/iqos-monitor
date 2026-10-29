@@ -106,4 +106,14 @@ describe("ingestEvents", () => {
     const dev = getSqlite().prepare("SELECT full_history_complete FROM devices WHERE serial=?").get(serial) as { full_history_complete: number };
     expect(dev.full_history_complete).toBe(1);
   });
+
+  it("a cancelled job is not revived by the agent's progress report", () => {
+    const c = ingest.createJob(serial, "full_history");
+    ingest.updateJob(c.id, { status: "cancelled" });
+    const after = ingest.updateJob(c.id, { status: "running", progress_done: 5, progress_total: 50 });
+    expect(after?.status).toBe("cancelled");
+    expect(after?.progressDone).toBe(5);
+    // ...but the agent is still told about it for a while
+    expect(ingest.pendingJobs([serial]).map((j) => j.status)).toEqual(["cancelled"]);
+  });
 });

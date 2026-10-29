@@ -292,7 +292,9 @@ class DeviceWorker(threading.Thread):
             if self.client and time.monotonic() - last_report[0] > 2.0:
                 last_report[0] = time.monotonic()
                 try:
-                    self.client.post_job(job_id, status="running", progress_done=done, progress_total=total)
+                    reply = self.client.post_job(job_id, status="running", progress_done=done, progress_total=total)
+                    if (reply.get("job") or {}).get("status") == "cancelled":
+                        self.cancelled_jobs.add(job_id)
                 except ServerError:
                     pass
 

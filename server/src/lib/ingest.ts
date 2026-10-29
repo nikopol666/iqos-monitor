@@ -329,7 +329,12 @@ export interface JobUpdate {
 export function updateJob(id: number, patch: JobUpdate): schema.AgentJob | undefined {
   const db = getDb();
   const set: Partial<schema.AgentJob> = { updatedUtc: nowUtc() };
-  if (patch.status) set.status = patch.status;
+  const current = db.select({ status: schema.agentJobs.status }).from(schema.agentJobs).where(eq(schema.agentJobs.id, id)).get();
+  if (!current) return undefined;
+  // A cancelled job stays cancelled: the agent's progress reports ("running")
+  // race with the user's cancel and must not revive it.
+  const revive = current.status === "cancelled" && (patch.status === "running" || patch.status === "queued");
+  if (patch.status && !revive) set.status = patch.status;
   if (typeof patch.progress_done === "number") set.progressDone = patch.progress_done;
   if (patch.progress_total !== undefined) set.progressTotal = patch.progress_total;
   if (patch.message !== undefined) set.message = patch.message;
