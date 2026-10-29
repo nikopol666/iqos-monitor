@@ -63,7 +63,8 @@ docker compose up -d
 
 Volume name = `<compose project>_iqos-data`; check with `docker volume ls`. The copy must be a
 checkpointed SQLite file (`PRAGMA wal_checkpoint(TRUNCATE)` or `.backup`), not a live file with
-a `-wal` sidecar. The container runs as uid 1000 (`node`), hence the `chown`.
+a `-wal` sidecar. The container fixes ownership of `/data` itself at start (entrypoint runs as
+root, the server as uid 1000 `node`), so a root-owned volume or bind mount is fine.
 
 Then on each PC: tray icon → Settings → server URL `http://<server-ip>:3000`, Test, Save.
 The existing API key keeps working because the agents table moved with the database.
