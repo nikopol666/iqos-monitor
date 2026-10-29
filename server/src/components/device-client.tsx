@@ -145,7 +145,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
               <div key={k} className="flex items-center justify-between gap-3 border-b border-border py-1">
                 <dt className="flex items-center gap-2 text-text-2">
                   {k}
-                  <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none ${tagClass[tag]}`} title={source}>
+                  <span className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none ${tagClass[tag]}`} title={source}>
                     {tagLabel[tag]}
                   </span>
                 </dt>
@@ -154,11 +154,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
             ))}
           </dl>
           <p className="mt-2 text-[11px] text-muted">{t.device.tagLegend}</p>
-          {snapshot ? (
-            <p className="mt-2 text-xs text-muted">
-              brightness: {snapshot.statuses.brightness ?? "—"} · vibration: {snapshot.statuses.vibration ?? "—"} · FlexBattery: {snapshot.statuses.flexbattery ?? "—"}
-            </p>
-          ) : null}
+
         </Card>
 
         <Card>
