@@ -92,6 +92,7 @@ class DeviceWorker(threading.Thread):
         self.jobs: list[dict] = []
         self.jobs_lock = threading.Lock()
         self.cancelled_jobs: set[int] = set()
+        self.seen_jobs: set[int] = set()  # ids already started by this worker
         self._last_live = 0.0
         self._last_upload = 0.0
         self._live_failures = 0
@@ -105,12 +106,15 @@ class DeviceWorker(threading.Thread):
             for job in jobs:
                 if job["status"] == "cancelled":
                     self.cancelled_jobs.add(job["id"])
-                elif job["id"] not in known and job["type"] in ("full_history", "set_setting"):
+                elif job["id"] not in known and job["id"] not in self.seen_jobs and job["type"] in ("full_history", "set_setting"):
                     self.jobs.append(job)
 
     def _pop_job(self) -> Optional[dict]:
         with self.jobs_lock:
-            return self.jobs.pop(0) if self.jobs else None
+            job = self.jobs.pop(0) if self.jobs else None
+            if job is not None:
+                self.seen_jobs.add(job["id"])
+            return job
 
     # -- status helpers -----------------------------------------------------------------
     def _set(self, **fields) -> None:
@@ -304,9 +308,16 @@ class DeviceWorker(threading.Thread):
             message = None if ok else "incomplete; reconnect to resume"
         except Exception as exc:
             ok = False
-            final = "failed"
-            message = str(exc)
-            log.warning("full history failed: %s", exc)
+            if self.stop_event.is_set() or isinstance(exc, OSError) or "read error" in str(exc).lower():
+                # USB dropped mid-download: keep the job queued, the next connection resumes it.
+                final = "queued"
+                message = "device disconnected; resumes on reconnect"
+                log.warning("full history interrupted (%s); job %s stays queued", exc, job_id)
+                self.stop_event.set()
+            else:
+                final = "failed"
+                message = str(exc)
+                log.warning("full history failed: %s", exc)
         finally:
             self._set(syncing=False, sync_total=None, sync_done=0)
         if self.client:
