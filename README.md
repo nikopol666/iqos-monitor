@@ -20,10 +20,10 @@ The original standalone v0.5 tooling is kept in `IQOS-History/` for reference.
 cd server
 npm ci
 npm test            # protocol decoders against test-vectors/, stats, ingest
-npm run dev         # http://localhost:3000, SQLite in server/data/
+npm run dev         # http://localhost:3000, SQLite in ~/IQOS Monitor/iqos.sqlite3
 ```
 
-Environment: `DATABASE_PATH` (default `./data/iqos.sqlite3`), `DISPLAY_TZ`
+Environment: `DATABASE_PATH` (default `~/IQOS Monitor/iqos.sqlite3`; keep it outside the project tree, the dev watcher reloads on every write otherwise), `DISPLAY_TZ`
 (default `Europe/Prague`), optional `AGENT_API_KEY` (a fixed key every agent may
 use; otherwise generate keys in *Settings → Agents*). Language follows the
 browser (`Accept-Language`), overridable in the header; English is the default,

@@ -92,7 +92,7 @@ const DeviceCard = memo(function DeviceCard({ d, eta }: { d: DeviceOverview; eta
     >
       <div className="flex gap-3 sm:gap-4">
         <DeviceImage variant={d.variant} color={d.color} name={d.name} size={150} connected={d.connected} syncing={!!d.sync} charging={d.charging} battery={d.lifetime.battery} className="hidden sm:flex" />
-        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} syncing={!!d.sync} charging={d.charging} battery={d.lifetime.battery} className="sm:hidden" />
+        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={96} connected={d.connected} syncing={!!d.sync} charging={d.charging} battery={d.lifetime.battery} className="sm:hidden" />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -121,7 +121,7 @@ const DeviceCard = memo(function DeviceCard({ d, eta }: { d: DeviceOverview; eta
             )}
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-2 text-sm min-[420px]:grid-cols-2">
+          <div className="mt-3 hidden grid-cols-2 gap-2 text-sm sm:grid">
             <Metric
               label={d.connected && d.charging != null ? (d.charging ? t.overview.charging : t.overview.charged) : t.overview.battery}
               value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
@@ -132,6 +132,16 @@ const DeviceCard = memo(function DeviceCard({ d, eta }: { d: DeviceOverview; eta
             <Metric label={t.overview.lifetimePuffs} value={fmt.integer(d.lifetime.puffs)} />
           </div>
         </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:hidden">
+        <Metric
+          label={d.connected && d.charging != null ? (d.charging ? t.overview.charging : t.overview.charged) : t.overview.battery}
+          value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
+          icon={d.connected && d.charging ? <BatteryCharging size={16} aria-hidden className="anim-bolt text-good" /> : <BatteryMedium size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
+        />
+        <Metric label={t.overview.brightness} value={brightness} icon={<Sun size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />} />
+        <Metric label={t.overview.lifetimeSticks} value={fmt.integer(d.lifetime.sticks)} />
+        <Metric label={t.overview.lifetimePuffs} value={fmt.integer(d.lifetime.puffs)} />
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-2">

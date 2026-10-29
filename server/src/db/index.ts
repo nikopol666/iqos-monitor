@@ -1,13 +1,18 @@
 import Database from "better-sqlite3";
 import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import * as schema from "./schema";
 import { MIGRATIONS } from "./bootstrap.sql";
 
 export type Db = BetterSQLite3Database<typeof schema>;
 
-const DEFAULT_PATH = path.join(process.cwd(), "data", "iqos.sqlite3");
+// Docker sets DATABASE_PATH=/data/iqos.sqlite3. Locally the database must live
+// OUTSIDE the project tree: the agent writes live data every second, and the
+// Next.js dev watcher (Turbopack, no ignore option) treats the changing WAL
+// file as a source change, recompiling and reloading every open page in a loop.
+const DEFAULT_PATH = path.join(os.homedir(), "IQOS Monitor", "iqos.sqlite3");
 
 interface Handle {
   sqlite: Database.Database;
