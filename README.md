@@ -39,14 +39,34 @@ there and register it in `server/src/lib/variants.ts`.
 ## Docker
 
 ```bash
-# on the Docker host
-docker login ghcr.io                       # PAT with read:packages
-GHCR_OWNER=<github-user> docker compose pull
-GHCR_OWNER=<github-user> docker compose up -d
+# on the Docker host, in a folder holding docker-compose.yml from this repo
+echo "GHCR_OWNER=<github-user>" > .env     # image: ghcr.io/<github-user>/iqos-monitor:latest
+docker login ghcr.io                       # PAT with read:packages (private image)
+docker compose pull
+docker compose up -d
 ```
 
-Data lives in the `iqos-data` volume. To build on the host instead of pulling:
+Data lives in the `iqos-data` volume (`/data/iqos.sqlite3`). To build on the host instead of pulling:
 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
+
+### Moving an existing database to the server
+
+The agent only re-sends records the server has not acknowledged, so a fresh server would
+start empty. Copy the development database (users, devices, colours, agent keys and all
+records) into the volume **before** the first start, or stop the container first:
+
+```bash
+docker compose stop                                   # if it already runs
+docker run --rm -v "$(pwd)":/src -v iqos_iqos-data:/data alpine   sh -c "cp /src/iqos.sqlite3 /data/iqos.sqlite3 && rm -f /data/iqos.sqlite3-wal /data/iqos.sqlite3-shm && chown 1000:1000 /data/iqos.sqlite3"
+docker compose up -d
+```
+
+Volume name = `<compose project>_iqos-data`; check with `docker volume ls`. The copy must be a
+checkpointed SQLite file (`PRAGMA wal_checkpoint(TRUNCATE)` or `.backup`), not a live file with
+a `-wal` sidecar. The container runs as uid 1000 (`node`), hence the `chown`.
+
+Then on each PC: tray icon → Settings → server URL `http://<server-ip>:3000`, Test, Save.
+The existing API key keeps working because the agents table moved with the database.
 
 ## Agent
 
