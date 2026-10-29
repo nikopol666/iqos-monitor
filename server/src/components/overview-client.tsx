@@ -80,8 +80,8 @@ const DeviceCard = memo(function DeviceCard({ d }: { d: DeviceOverview }) {
       style={{ borderTopColor: colorCss(d.color), borderTopWidth: 3 }}
     >
       <div className="flex gap-3 sm:gap-4">
-        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={150} connected={d.connected} battery={d.lifetime.battery} className="hidden sm:flex" />
-        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} battery={d.lifetime.battery} className="sm:hidden" />
+        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={150} connected={d.connected} syncing={!!d.sync} charging={d.charging} battery={d.lifetime.battery} className="hidden sm:flex" />
+        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} syncing={!!d.sync} charging={d.charging} battery={d.lifetime.battery} className="sm:hidden" />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -114,7 +114,7 @@ const DeviceCard = memo(function DeviceCard({ d }: { d: DeviceOverview }) {
             <Metric
               label={d.connected && d.charging != null ? (d.charging ? t.overview.charging : t.overview.charged) : t.overview.battery}
               value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
-              icon={d.connected && d.charging ? <BatteryCharging size={16} aria-hidden className="text-good" /> : <BatteryMedium size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
+              icon={d.connected && d.charging ? <BatteryCharging size={16} aria-hidden className="anim-bolt text-good" /> : <BatteryMedium size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
             />
             <Metric label={t.overview.brightness} value={brightness} icon={<Sun size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />} />
             <Metric label={t.overview.lifetimeSticks} value={fmt.integer(d.lifetime.sticks)} />

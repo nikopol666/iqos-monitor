@@ -118,7 +118,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} battery={d.lifetime.battery} />
+        <DeviceImage variant={d.variant} color={d.color} name={d.name} size={110} connected={d.connected} syncing={!!d.sync} charging={d.charging} battery={d.lifetime.battery} />
         <h1 className="text-xl font-semibold">{d.name}</h1>
         {d.user ? (
           <span className="inline-flex items-center gap-1 text-sm text-text-2">

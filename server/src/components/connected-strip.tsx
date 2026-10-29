@@ -6,7 +6,7 @@ import type { DeviceOverview } from "@/lib/queries";
 import { colorCss } from "@/lib/palette";
 import { variantImage } from "@/lib/variants";
 import { useI18n } from "@/lib/i18n/client";
-import { ArrowDownUp } from "lucide-react";
+import { ArrowDownUp, Zap } from "lucide-react";
 
 /** Header strip: every connected device as a small animated badge (polls every 2 s). */
 export function ConnectedStrip() {
@@ -48,12 +48,17 @@ export function ConnectedStrip() {
             title={`${d.name} · ${t.overview.connected}`}
           >
             <span className="relative flex h-7 w-5 items-end justify-center">
-              <span className="anim-breathe absolute inset-0 rounded-full blur-md" style={{ background: colorCss(d.color) }} aria-hidden />
+              <span className={`${d.sync ? "anim-breathe-fast" : "anim-breathe"} absolute inset-0 rounded-full blur-md`} style={{ background: colorCss(d.color) }} aria-hidden />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={variantImage(d.variant)} alt="" className="relative h-7 w-auto object-contain" draggable={false} />
             </span>
             <span className="hidden max-w-[8rem] truncate sm:inline lg:hidden xl:inline xl:max-w-[12rem]">{d.name}</span>
-            {d.lifetime.battery != null ? <span className="tabular">{d.lifetime.battery} %</span> : null}
+            {d.lifetime.battery != null ? (
+              <span className="inline-flex items-center gap-1 tabular">
+                {d.charging ? <Zap size={11} className="anim-bolt text-good" aria-hidden /> : null}
+                {d.lifetime.battery} %
+              </span>
+            ) : null}
             {d.sync ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-1.5 py-0.5 text-accent" title={d.sync.total ? f(t.overview.syncing, { done: d.sync.done, total: d.sync.total }) : t.overview.syncingShort}>
                 <ArrowDownUp size={12} className="anim-transfer" aria-hidden />
