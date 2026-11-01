@@ -1,5 +1,7 @@
 import { addDays, daysBetweenInclusive, isoWeekKey, isoWeekStart, localParts, monthKey, DISPLAY_TZ } from "./time";
 
+import { puffSpan } from "./protocol/history";
+
 export type GroupBy = "day" | "week" | "month";
 
 export interface StatRow {
@@ -7,6 +9,8 @@ export interface StatRow {
   timestampUtc: string;
   puffCount: number | null;
   clockSuspect: number;
+  /** JSON array of puff pairs (hex), when available. */
+  puffPairsJson?: string | null;
 }
 
 export interface Bucket {
@@ -20,6 +24,8 @@ export interface Bucket {
   sessions: number;
   puffs: number;
   suspect: number;
+  /** Average seconds from session start to the last puff (sessions with pair data). */
+  avgLastPuffS: number | null;
   perSerial: Record<string, { records: number; sessions: number; puffs: number }>;
 }
 
@@ -37,6 +43,9 @@ export interface StatTotals {
   avgSessionsPerActiveDay: number;
   avgPuffsPerActiveDay: number;
   avgPuffsPerSession: number | null;
+  /** Average seconds from session start to the last puff, and to the first puff. */
+  avgLastPuffS: number | null;
+  avgFirstPuffS: number | null;
 }
 
 export interface StatsResult {
@@ -76,13 +85,17 @@ export function computeStats(rows: StatRow[], from: string, to: string, groupBy:
     let b = buckets.get(key);
     if (!b) {
       const start = groupBy === "week" ? isoWeekStart(day) : groupBy === "month" ? day.slice(0, 7) + "-01" : day;
-      b = { key, start: start < from ? from : start, end: day, days: 0, records: 0, sessions: 0, puffs: 0, suspect: 0, perSerial: {} };
+      b = { key, start: start < from ? from : start, end: day, days: 0, records: 0, sessions: 0, puffs: 0, suspect: 0, avgLastPuffS: null, perSerial: {} };
       buckets.set(key, b);
     }
     b.end = day;
     b.days++;
   }
   const activeDays = new Set<string>();
+  const spanSum = new Map<string, { last: number; n: number }>();
+  let lastSum = 0;
+  let firstSum = 0;
+  let spanN = 0;
   const byHour = new Array<number>(24).fill(0);
   const byWeekday = new Array<number>(7).fill(0);
   let records = 0;
@@ -119,6 +132,27 @@ export function computeStats(rows: StatRow[], from: string, to: string, groupBy:
     ps.records++;
     if (isSession) ps.sessions++;
     ps.puffs += p;
+    if (isSession && row.puffPairsJson) {
+      let span: { first: number; last: number } | null = null;
+      try {
+        span = puffSpan(JSON.parse(row.puffPairsJson) as string[]);
+      } catch {
+        span = null;
+      }
+      if (span) {
+        const acc = spanSum.get(b.key) ?? { last: 0, n: 0 };
+        acc.last += span.last;
+        acc.n++;
+        spanSum.set(b.key, acc);
+        lastSum += span.last;
+        firstSum += span.first;
+        spanN++;
+      }
+    }
+  }
+  for (const [key, acc] of spanSum) {
+    const b = buckets.get(key);
+    if (b) b.avgLastPuffS = acc.n ? Math.round(acc.last / acc.n) : null;
   }
   const daysInRange = daysBetweenInclusive(from, to);
   const daysWithData = activeDays.size;
@@ -136,6 +170,8 @@ export function computeStats(rows: StatRow[], from: string, to: string, groupBy:
     avgSessionsPerActiveDay: daysWithData ? round2(sessions / daysWithData) : 0,
     avgPuffsPerActiveDay: daysWithData ? round2(puffs / daysWithData) : 0,
     avgPuffsPerSession: sessions ? round2(puffs / sessions) : null,
+    avgLastPuffS: spanN ? Math.round(lastSum / spanN) : null,
+    avgFirstPuffS: spanN ? Math.round(firstSum / spanN) : null,
   };
   return { groupBy, from, to, tz, buckets: [...buckets.values()], totals, byHour, byWeekday };
 }

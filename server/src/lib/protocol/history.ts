@@ -93,6 +93,19 @@ export interface DecodedEvent {
  * Normalise an incoming (status, response_hex) the same way the agent's
  * storage.save_event / import_json_files do, and decode it.
  */
+/**
+ * Byte 0 of every puff pair is the puff's time in seconds since the session
+ * started (consistent with the device's last-session register on 8 sessions:
+ * the last puff always falls before the session end, the first after the
+ * heat-up). Returns [first, last] seconds or null.
+ */
+export function puffSpan(pairs: string[] | null | undefined): { first: number; last: number } | null {
+  if (!pairs || !pairs.length) return null;
+  const times = pairs.map((p) => parseInt(p.slice(0, 2), 16)).filter((n) => Number.isFinite(n));
+  if (!times.length) return null;
+  return { first: Math.min(...times), last: Math.max(...times) };
+}
+
 export function decodeEvent(status: string, responseHex: string | null | undefined, now?: Date): DecodedEvent {
   let frame: Uint8Array | null = null;
   if (responseHex) {

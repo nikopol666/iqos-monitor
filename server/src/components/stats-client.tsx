@@ -380,8 +380,13 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
               <Kpi label={t.stats.totalPuffs} value={fmt.integer(data.totals.puffs)} delta={deltaText(data.totals.puffs, data.previous?.puffs)} />
               <Kpi
                 label={t.stats.stickDuration}
-                value={data.sessionLength.seconds == null ? "—" : `${fmt.number(Math.round(data.sessionLength.seconds / 6) / 10)} min`}
-                hint={data.sessionLength.seconds == null ? t.stats.stickDurationNone : f(t.stats.stickDurationHint, { sticks: fmt.integer(data.sessionLength.sticks), n: data.sessionLength.intervals })}
+                value={data.totals.avgLastPuffS == null ? "—" : `${fmt.number(Math.round(data.totals.avgLastPuffS / 6) / 10)} min`}
+                delta={data.totals.avgLastPuffS == null || data.previous?.avgLastPuffS == null ? null : deltaText(data.totals.avgLastPuffS, data.previous.avgLastPuffS)}
+                hint={
+                  data.totals.avgLastPuffS == null
+                    ? t.stats.stickDurationNone
+                    : `${f(t.stats.stickDurationHint, { first: data.totals.avgFirstPuffS ?? 0 })}${data.sessionLength.seconds != null ? ` · ${f(t.stats.sessionLengthHint, { min: fmt.number(Math.round(data.sessionLength.seconds / 6) / 10) })}` : ""}`
+                }
               />
             </div>
 
@@ -451,6 +456,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                               <th className="py-1.5 pr-3 font-medium">{t.device.colTime}</th>
                               <th className="py-1.5 pr-3 font-medium">{t.stats.device}</th>
                               <th className="py-1.5 pr-3 text-right font-medium">{t.device.colPuffs}</th>
+                              <th className="py-1.5 pr-3 text-right font-medium">{t.device.colDuration}</th>
                               <th className="py-1.5 font-medium">{t.device.colId}</th>
                             </tr>
                           </thead>
@@ -470,6 +476,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                                     </Link>
                                   </td>
                                   <td className="py-1.5 pr-3 text-right">{r.puffCount ?? "—"}</td>
+                                  <td className="py-1.5 pr-3 text-right">{r.lastPuffS == null ? "—" : `${Math.floor(r.lastPuffS / 60)}:${String(r.lastPuffS % 60).padStart(2, "0")}`}</td>
                                   <td className="py-1.5 font-mono text-xs text-muted">{r.eventId}</td>
                                 </tr>
                               );
@@ -495,7 +502,8 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.sessions}</th>
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.puffs}</th>
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.avgSticksPerDay}</th>
-                          <th className="py-1.5 text-right font-medium">{t.stats.avgPuffsPerStick}</th>
+                          <th className="py-1.5 pr-3 text-right font-medium">{t.stats.avgPuffsPerStick}</th>
+                          <th className="py-1.5 text-right font-medium">{t.stats.stickDurationShort}</th>
                         </tr>
                       </thead>
                       <tbody className="tabular">
@@ -509,7 +517,8 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                             <td className="py-1.5 pr-3 text-right">{fmt.integer(b.sessions)}</td>
                             <td className="py-1.5 pr-3 text-right">{fmt.integer(b.puffs)}</td>
                             <td className="py-1.5 pr-3 text-right">{fmt.number(Math.round((b.sessions / b.days) * 100) / 100)}</td>
-                            <td className="py-1.5 text-right">{b.sessions ? fmt.number(Math.round((b.puffs / b.sessions) * 10) / 10) : "—"}</td>
+                            <td className="py-1.5 pr-3 text-right">{b.sessions ? fmt.number(Math.round((b.puffs / b.sessions) * 10) / 10) : "—"}</td>
+                            <td className="py-1.5 text-right">{b.avgLastPuffS == null ? "—" : `${fmt.number(Math.round(b.avgLastPuffS / 6) / 10)} min`}</td>
                           </tr>
                         ))}
                       </tbody>

@@ -2,6 +2,7 @@
 import { and, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { getDb, getSqlite, schema } from "@/db";
 import { isLiveConnected, openFullHistoryJob } from "@/lib/ingest";
+import { puffSpan } from "@/lib/protocol/history";
 import { computeStats, type GroupBy, type StatRow, type StatsResult, type StatTotals } from "@/lib/stats";
 import { localDayRangeUtc, todayKey, DISPLAY_TZ, addDays, daysBetweenInclusive } from "@/lib/time";
 import { deviceLabel } from "@/lib/variants";
@@ -211,6 +212,7 @@ export function statsFor(q: StatsQuery, withPrevious = true): StatsResult & { su
       timestampUtc: schema.events.timestampUtc,
       puffCount: schema.events.puffCount,
       clockSuspect: schema.events.clockSuspect,
+      puffPairsJson: schema.events.puffPairsJson,
     })
     .from(schema.events)
     .where(
@@ -239,12 +241,23 @@ export function statsFor(q: StatsQuery, withPrevious = true): StatsResult & { su
   return { ...computeStats(rows, q.from, q.to, q.groupBy, DISPLAY_TZ), suspectHidden, previous };
 }
 
+function safeSpan(json: string | null | undefined): { first: number; last: number } | null {
+  if (!json) return null;
+  try {
+    return puffSpan(JSON.parse(json) as string[]);
+  } catch {
+    return null;
+  }
+}
+
 export interface DayRecord {
   serial: string;
   eventId: number;
   timestampUtc: string;
   puffCount: number | null;
   clockSuspect: boolean;
+  /** Seconds from session start to the last puff, when pair data exists. */
+  lastPuffS: number | null;
 }
 
 /** Timestamped records of the given devices inside local days [from, to] (drill-down from the charts). */
@@ -258,6 +271,7 @@ export function recordsInRange(serials: string[], from: string, to: string, excl
       timestampUtc: schema.events.timestampUtc,
       puffCount: schema.events.puffCount,
       clockSuspect: schema.events.clockSuspect,
+      puffPairsJson: schema.events.puffPairsJson,
     })
     .from(schema.events)
     .where(
@@ -273,7 +287,14 @@ export function recordsInRange(serials: string[], from: string, to: string, excl
     .orderBy(desc(schema.events.timestampUtc))
     .limit(limit)
     .all();
-  return rows.map((r) => ({ ...r, timestampUtc: r.timestampUtc!, clockSuspect: !!r.clockSuspect }));
+  return rows.map((r) => ({
+    serial: r.serial,
+    eventId: r.eventId,
+    timestampUtc: r.timestampUtc!,
+    puffCount: r.puffCount,
+    clockSuspect: !!r.clockSuspect,
+    lastPuffS: safeSpan(r.puffPairsJson)?.last ?? null,
+  }));
 }
 
 export interface EventPage {
@@ -283,6 +304,7 @@ export interface EventPage {
     status: string;
     puffCount: number | null;
     puffPairs: string[] | null;
+    lastPuffS: number | null;
     clockSuspect: boolean;
     responseHex: string | null;
     endNoticeUtc: string | null;
@@ -328,6 +350,7 @@ export function eventPage(serial: string, offset: number, limit: number, status?
       status: r.status,
       puffCount: r.puff_count,
       puffPairs: r.puff_pairs_json ? (JSON.parse(r.puff_pairs_json) as string[]) : null,
+      lastPuffS: safeSpan(r.puff_pairs_json)?.last ?? null,
       clockSuspect: !!r.clock_suspect,
       responseHex: r.response_hex,
       endNoticeUtc: r.end_notice_utc,

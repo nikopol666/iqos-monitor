@@ -225,6 +225,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
                   <th className="py-1.5 pr-3 font-medium">{t.device.colId}</th>
                   <th className="py-1.5 pr-3 font-medium">{t.device.colTime}</th>
                   <th className="py-1.5 pr-3 text-right font-medium">{t.device.colPuffs}</th>
+                  <th className="py-1.5 pr-3 text-right font-medium">{t.device.colDuration}</th>
                   <th className="py-1.5 pr-3 font-medium">{t.device.colStatus}</th>
                   <th className="py-1.5 font-medium">{t.device.colHex}</th>
                 </tr>
@@ -238,6 +239,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
                       {e.clockSuspect ? <span title={t.device.clockSuspect}> ⚠</span> : null}
                     </td>
                     <td className="py-1.5 pr-3 text-right">{e.puffCount ?? "—"}</td>
+                    <td className="py-1.5 pr-3 text-right">{e.lastPuffS == null ? "—" : `${Math.floor(e.lastPuffS / 60)}:${String(e.lastPuffS % 60).padStart(2, "0")}`}</td>
                     <td className="py-1.5 pr-3 text-xs">{(t.status as Record<string, string>)[e.status] ?? e.status}</td>
                     <td className="py-1.5">
                       {e.responseHex ? (
