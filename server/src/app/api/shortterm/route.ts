@@ -1,4 +1,4 @@
-import { json } from "@/lib/api";
+import { clampInt, json } from "@/lib/api";
 import { listDevicesLabeled } from "@/lib/queries";
 import { shortTermStats } from "@/lib/shortterm";
 
@@ -10,6 +10,6 @@ export async function GET(request: Request) {
   const userParam = params.get("user");
   const userId = userParam && userParam !== "all" ? Number(userParam) : null;
   const devices = listDevicesLabeled().filter((d) => userId == null || d.userId === userId);
-  const stats = shortTermStats(devices.map((d) => d.serial), undefined, params.get("today") === "1");
+  const stats = shortTermStats(devices.map((d) => d.serial), undefined, params.get("today") === "1", clampInt(params.get("week_start"), 1, 7, 1));
   return json({ ...stats, devices: devices.map((d) => ({ serial: d.serial, name: d.name, color: d.color })) });
 }

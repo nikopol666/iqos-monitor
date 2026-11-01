@@ -1,7 +1,7 @@
 /** Short-term usage for the overview page: today, this ISO week, last 7 days. */
 import { and, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { addDays, isoWeekStart, localDateKey, localDayRangeUtc, todayKey, DISPLAY_TZ } from "@/lib/time";
+import { addDays, localDateKey, localDayRangeUtc, todayKey, weekStartOf, DISPLAY_TZ } from "@/lib/time";
 
 export interface DayPoint {
   day: string;
@@ -41,9 +41,9 @@ function isoNoMs(d: Date): string {
   return d.toISOString().replace(/\.\d{3}Z$/, "+00:00");
 }
 
-export function shortTermStats(serials: string[], tz: string = DISPLAY_TZ, includeToday = false): ShortTermStats {
+export function shortTermStats(serials: string[], tz: string = DISPLAY_TZ, includeToday = false, firstDay: number = 1): ShortTermStats {
   const today = todayKey(tz);
-  const weekStart = isoWeekStart(today);
+  const weekStart = weekStartOf(today, firstDay);
   const lastWeekStart = addDays(weekStart, -7);
   const from = addDays(today, -13) < lastWeekStart ? addDays(today, -13) : lastWeekStart;
   const last7End = includeToday ? today : addDays(today, -1);

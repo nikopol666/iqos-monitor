@@ -3,6 +3,7 @@ import { listDevicesLabeled, listUsers, overview } from "@/lib/queries";
 import { shortTermStats } from "@/lib/shortterm";
 import { OverviewClient, OVERVIEW_USER_COOKIE, type OverviewUser } from "@/components/overview-client";
 import { SHORT_TODAY_COOKIE } from "@/components/shortterm-client";
+import { getWeekStart } from "@/lib/prefs-server";
 
 /**
  * The overview is one person's page: it shows that user's devices and week.
@@ -21,7 +22,7 @@ export default async function OverviewPage() {
   else if (users.length === 1) selected = users[0].id;
   else if (users.length > 1) selected = devices.find((d) => d.connected && d.user)?.user?.id ?? users[0].id;
   const labeled = listDevicesLabeled().filter((d) => selected === "all" || d.userId === selected);
-  const stats = shortTermStats(labeled.map((d) => d.serial), undefined, includeToday);
+  const stats = shortTermStats(labeled.map((d) => d.serial), undefined, includeToday, await getWeekStart());
   const week = { ...stats, devices: labeled.map((d) => ({ serial: d.serial, name: d.name, color: d.color })) };
   return <OverviewClient initial={devices} users={users} initialUser={selected} week={week} includeToday={includeToday} />;
 }

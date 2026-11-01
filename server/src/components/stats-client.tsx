@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, ChevronUp, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, SlidersHorizontal } from "lucide-react";
 import { Bar, CartesianGrid, ComposedChart, LabelList, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import type { StatsResult, GroupBy, Bucket, StatTotals } from "@/lib/stats";
 import type { DayRecord } from "@/lib/queries";
+import { addDays, isoWeekKey, monthEnd, weekStartOf } from "@/lib/time";
 import { Card, CardTitle, Notice } from "@/components/ui";
 import { colorCss } from "@/lib/palette";
 
@@ -29,7 +30,10 @@ type StatsResponse = StatsResult & {
   devices: { serial: string; name: string; color: string }[];
 };
 
-interface View {
+/** Day / week / month page through calendar periods; range is presets or custom dates with its own grouping. */
+type Mode = "day" | "week" | "month" | "range";
+
+interface RangeView {
   from: string;
   to: string;
   group: GroupBy;
@@ -52,14 +56,26 @@ function useElementWidth(ref: React.RefObject<HTMLDivElement | null>): number {
   return width;
 }
 
-function shiftDays(key: string, n: number): string {
-  const [y, m, d] = key.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+function addMonths(dateKey: string, n: number): string {
+  const [y, m] = dateKey.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return d.toISOString().slice(0, 10);
 }
 
 /** Grouping that reads best for a range length. */
 function autoGroup(days: number | null): GroupBy {
   return days === null || days >= 365 ? "month" : days >= 90 ? "week" : "day";
+}
+
+/** Calendar period for the pager modes. */
+function periodBounds(mode: Exclude<Mode, "range">, anchor: string, weekStart: number): RangeView {
+  if (mode === "day") return { from: anchor, to: anchor, group: "hour" };
+  if (mode === "week") {
+    const from = weekStartOf(anchor, weekStart);
+    return { from, to: addDays(from, 6), group: "day" };
+  }
+  const from = anchor.slice(0, 7) + "-01";
+  return { from, to: monthEnd(anchor), group: "day" };
 }
 
 /** One-row segmented control: the active option is unmistakable. */
@@ -89,11 +105,14 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
 }
 
 export function StatsClient({ devices, users, defaultFrom, defaultTo }: { devices: DeviceOpt[]; users: UserOpt[]; defaultFrom: string; defaultTo: string }) {
-  const { t, f } = useI18n();
+  const { t, f, weekStart, tz } = useI18n();
   const fmt = useFormat();
+  const [mode, setMode] = useState<Mode>("week");
+  const [anchor, setAnchor] = useState(defaultTo);
   // Default 90-day range reads better by week; day grouping stays one click away.
-  const [view, setView] = useState<View>({ from: defaultFrom, to: defaultTo, group: "week" });
-  const [history, setHistory] = useState<View[]>([]);
+  const [range, setRange] = useState<RangeView>({ from: defaultFrom, to: defaultTo, group: "week" });
+  const [history, setHistory] = useState<RangeView[]>([]);
+  const view: RangeView = mode === "range" ? range : periodBounds(mode, anchor, weekStart);
   const { from, to, group } = view;
   const [userId, setUserId] = useState<string>("");
   const [serial, setSerial] = useState<string>("");
@@ -110,8 +129,9 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
     if (serial) params.set("device", serial);
     else if (userId) params.set("user", userId);
     if (includeSuspect) params.set("suspect", "1");
+    params.set("week_start", String(weekStart));
     return params;
-  }, [serial, userId, includeSuspect]);
+  }, [serial, userId, includeSuspect, weekStart]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -145,33 +165,49 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
     { key: "year", label: t.stats.presets.year, days: 365 },
     { key: "all", label: t.stats.presets.all, days: null },
   ];
-  const presetFrom = (days: number | null) => (days === null ? "2015-01-01" : shiftDays(defaultTo, -(days - 1)));
-  const activePreset = presets.find((p) => from === presetFrom(p.days) && to === defaultTo)?.key ?? "custom";
+  const presetFrom = (days: number | null) => (days === null ? "2015-01-01" : addDays(defaultTo, -(days - 1)));
+  const activePreset = presets.find((p) => range.from === presetFrom(p.days) && range.to === defaultTo)?.key ?? "custom";
   function applyPreset(key: string) {
     const p = presets.find((x) => x.key === key);
     if (!p) return;
     setHistory([]);
-    setView({ to: defaultTo, from: presetFrom(p.days), group: autoGroup(p.days) });
+    setRange({ to: defaultTo, from: presetFrom(p.days), group: autoGroup(p.days) });
   }
-  function patchView(patch: Partial<View>) {
+  function patchRange(patch: Partial<RangeView>) {
     setHistory([]);
-    setView((v) => ({ ...v, ...patch }));
+    setRange((v) => ({ ...v, ...patch }));
   }
+  function page(direction: -1 | 1) {
+    if (mode === "range") return;
+    setAnchor((a) => (mode === "day" ? addDays(a, direction) : mode === "week" ? addDays(a, 7 * direction) : addMonths(a, direction)));
+  }
+  const atToday = mode !== "range" && from <= defaultTo && to >= defaultTo;
+  const canGoNext = mode !== "range" && to < defaultTo;
 
   const dataGroup: GroupBy = data?.groupBy ?? group;
   const visibleDevices = useMemo(() => (userId ? devices.filter((d) => d.userId === Number(userId)) : devices), [devices, userId]);
-  const unitLabel = dataGroup === "day" ? t.stats.unitDay : dataGroup === "week" ? t.stats.unitWeek : t.stats.unitMonth;
+  const unitLabel = dataGroup === "hour" ? t.stats.unitHour : dataGroup === "day" ? t.stats.unitDay : dataGroup === "week" ? t.stats.unitWeek : t.stats.unitMonth;
 
   const dateKeyFmt = fmt.dateKey;
   const shortDayFmt = fmt.shortDateKey;
+  const intlLocale = fmt.intlLocale;
+  const monthName = useMemo(() => new Intl.DateTimeFormat(intlLocale, { month: "long", year: "numeric" }), [intlLocale]);
+  const weekdayLong = useMemo(() => new Intl.DateTimeFormat(intlLocale, { weekday: "long" }), [intlLocale]);
   const bucketLabel = useCallback(
-    (key: string, g: GroupBy, short = false): string => {
-      if (g === "day") return short ? shortDayFmt(key) : dateKeyFmt(key);
-      if (g === "week") return key.replace("-W", " W");
-      return key;
+    (b: { key: string; start: string; end: string }, g: GroupBy, short = false): string => {
+      if (g === "hour") return `${b.key.slice(11, 13)}:00`;
+      if (g === "day") return short ? shortDayFmt(b.key) : dateKeyFmt(b.key);
+      if (g === "week") return `${shortDayFmt(b.start)} – ${shortDayFmt(b.end)}`;
+      return short ? b.key : monthName.format(new Date(Date.UTC(Number(b.key.slice(0, 4)), Number(b.key.slice(5, 7)) - 1, 1, 12)));
     },
-    [dateKeyFmt, shortDayFmt],
+    [dateKeyFmt, shortDayFmt, monthName],
   );
+  const periodTitle = (() => {
+    if (mode === "day") return `${weekdayLong.format(new Date(Date.UTC(Number(from.slice(0, 4)), Number(from.slice(5, 7)) - 1, Number(from.slice(8, 10)), 12)))} ${dateKeyFmt(from)}`;
+    if (mode === "week") return `${shortDayFmt(from)} – ${shortDayFmt(to)}${weekStart === 1 ? ` · ${f(t.stats.weekLabel, { n: Number(isoWeekKey(from).slice(6)) })}` : ""}`;
+    if (mode === "month") return monthName.format(new Date(Date.UTC(Number(from.slice(0, 4)), Number(from.slice(5, 7)) - 1, 1, 12)));
+    return `${dateKeyFmt(from)} – ${dateKeyFmt(to)}`;
+  })();
 
   const series = useMemo(() => (data ? data.devices.filter((d) => !hidden.has(d.serial)) : []), [data, hidden]);
 
@@ -179,7 +215,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
     if (!data) return [];
     const g = data.groupBy;
     return data.buckets.map((b) => {
-      const row: Record<string, number | string | null> = { key: b.key, label: bucketLabel(b.key, g, true), full: bucketLabel(b.key, g), suspect: b.suspect };
+      const row: Record<string, number | string | null> = { key: b.key, label: bucketLabel(b, g, true), full: bucketLabel(b, g), suspect: b.suspect };
       let sessions = 0;
       let puffs = 0;
       for (const d of series) {
@@ -201,11 +237,19 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
     return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : 0;
   }, [chartRows]);
 
-  /** Click on a bucket: zoom to it one level finer, or list its records at day level. */
+  const localHour = useMemo(() => new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", hour12: false }), [tz]);
+
+  /** Click on a bucket: zoom one level finer, or list its records at day/hour level. */
   async function openBucket(b: Bucket) {
-    if (dataGroup !== "day") {
-      setHistory((h) => [...h, view]);
-      setView({ from: b.start, to: b.end, group: dataGroup === "month" ? "week" : "day" });
+    if (mode !== "range" && dataGroup === "day") {
+      // Week or month pager: jump to that day.
+      setMode("day");
+      setAnchor(b.key);
+      return;
+    }
+    if (mode === "range" && dataGroup !== "day") {
+      setHistory((h) => [...h, range]);
+      setRange({ from: b.start, to: b.end, group: dataGroup === "month" ? "week" : "day" });
       return;
     }
     setDrill({ bucket: b, items: null });
@@ -214,13 +258,14 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
     params.set("to", b.end);
     const res = await fetch(`/api/events?${params}`, { cache: "no-store" });
     const json = (await res.json()) as { items: DayRecord[] };
-    setDrill({ bucket: b, items: json.items });
+    const items = dataGroup === "hour" ? json.items.filter((r) => localHour.format(new Date(r.timestampUtc)) === b.key.slice(11, 13)) : json.items;
+    setDrill({ bucket: b, items });
   }
   function goBack() {
     const prev = history[history.length - 1];
     if (!prev) return;
     setHistory((h) => h.slice(0, -1));
-    setView(prev);
+    setRange(prev);
   }
   function toggleSeries(s: string) {
     setHidden((h) => {
@@ -233,10 +278,10 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
 
   const deviceBySerial = useMemo(() => new Map(devices.map((d) => [d.serial, d])), [devices]);
   const weekdayNames = useMemo(() => {
-    const dfmt = new Intl.DateTimeFormat(fmt.intlLocale, { weekday: "short" });
+    const dfmt = new Intl.DateTimeFormat(intlLocale, { weekday: "short" });
     // 2024-01-01 is a Monday.
     return Array.from({ length: 7 }, (_, i) => dfmt.format(new Date(Date.UTC(2024, 0, 1 + i, 12))));
-  }, [fmt.intlLocale]);
+  }, [intlLocale]);
 
   const deltaText = (cur: number, prev: number | undefined | null): string | null => {
     if (!data?.previous || prev == null) return null;
@@ -245,12 +290,19 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
     return `${pct > 0 ? "+" : ""}${pct} % ${f(t.stats.vsPrevious, { days: data.totals.daysInRange })}`;
   };
 
+  const modeOptions: { key: Mode; label: string }[] = [
+    { key: "day", label: t.stats.viewDay },
+    { key: "week", label: t.stats.viewWeek },
+    { key: "month", label: t.stats.viewMonth },
+    { key: "range", label: t.stats.viewRange },
+  ];
   const groupOptions: { key: GroupBy; label: string }[] = [
     { key: "day", label: t.stats.viewDay },
     { key: "week", label: t.stats.viewWeek },
     { key: "month", label: t.stats.viewMonth },
   ];
   const rangeOptions = [...presets.map((p) => ({ key: p.key, label: p.label })), ...(activePreset === "custom" ? [{ key: "custom", label: t.stats.custom }] : [])];
+  const showDistributions = dataGroup !== "hour";
 
   return (
     <div className="space-y-4">
@@ -258,28 +310,48 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
         <h1 className="text-xl font-semibold">{t.stats.title}</h1>
         <button type="button" className="ui-btn h-8 max-w-[70%] text-xs sm:hidden" onClick={() => setFiltersOpen((o) => !o)} aria-expanded={filtersOpen}>
           <SlidersHorizontal size={14} aria-hidden />
-          <span className="truncate">
-            {filtersOpen ? t.stats.hideFilters : `${bucketLabel(from, "day", true)} – ${bucketLabel(to, "day", true)} · ${unitLabel}`}
-          </span>
+          <span className="truncate">{filtersOpen ? t.stats.hideFilters : periodTitle}</span>
           {filtersOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
         </button>
       </div>
 
-      {/* One filter row above everything it scopes: range first, then the view, then who. */}
+      {/* One filter block above everything it scopes: the view first, then its period or range, then who. */}
       <div className={`${filtersOpen ? "flex" : "hidden"} flex-col gap-3 rounded-xl border border-border bg-surface p-3 sm:flex sm:border-0 sm:bg-transparent sm:p-0`}>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <Segmented label={t.stats.range} value={activePreset} options={rangeOptions} onChange={(k) => k !== "custom" && applyPreset(k)} />
-          <Segmented label={t.stats.view} value={group} options={groupOptions} onChange={(g) => patchView({ group: g })} />
+          <Segmented label={t.stats.view} value={mode} options={modeOptions} onChange={(m) => setMode(m)} />
+          {mode !== "range" ? (
+            <div className="flex items-center gap-1">
+              <button type="button" className="ui-btn h-8 w-8 px-0" onClick={() => page(-1)} aria-label={t.stats.prevPeriod} title={t.stats.prevPeriod}>
+                <ChevronLeft size={16} aria-hidden />
+              </button>
+              <span className="min-w-[10rem] px-2 text-center text-sm font-medium">{periodTitle}</span>
+              <button type="button" className="ui-btn h-8 w-8 px-0" onClick={() => page(1)} disabled={!canGoNext} aria-label={t.stats.nextPeriod} title={t.stats.nextPeriod}>
+                <ChevronRight size={16} aria-hidden />
+              </button>
+              {!atToday ? (
+                <button type="button" className="ui-btn h-8 text-xs" onClick={() => setAnchor(defaultTo)}>
+                  {t.stats.todayBtn}
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <Segmented label={t.stats.range} value={activePreset} options={rangeOptions} onChange={(k) => k !== "custom" && applyPreset(k)} />
+          )}
         </div>
+        {mode === "range" ? (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-xs text-text-2">
+            <label className="inline-flex items-center gap-2">
+              {t.common.from}
+              <input type="date" className="ui-input h-8" value={range.from} max={range.to} onChange={(e) => patchRange({ from: e.target.value })} />
+            </label>
+            <label className="inline-flex items-center gap-2">
+              {t.common.to}
+              <input type="date" className="ui-input h-8" value={range.to} min={range.from} onChange={(e) => patchRange({ to: e.target.value })} />
+            </label>
+            <Segmented label={t.stats.groupBy} value={range.group} options={groupOptions} onChange={(g) => patchRange({ group: g })} />
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-xs text-text-2">
-          <label className="inline-flex items-center gap-2">
-            {t.common.from}
-            <input type="date" className="ui-input h-8" value={from} max={to} onChange={(e) => patchView({ from: e.target.value })} />
-          </label>
-          <label className="inline-flex items-center gap-2">
-            {t.common.to}
-            <input type="date" className="ui-input h-8" value={to} min={from} onChange={(e) => patchView({ to: e.target.value })} />
-          </label>
           {users.length > 1 ? (
             <div className="inline-flex items-center gap-2">
               {t.stats.user}
@@ -351,7 +423,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
 
       {history.length ? (
         <button type="button" className="ui-btn h-8 text-xs" onClick={goBack}>
-          <ArrowLeft size={14} aria-hidden /> {t.stats.back} · {bucketLabel(history[history.length - 1].from, "day")} – {bucketLabel(history[history.length - 1].to, "day")}
+          <ArrowLeft size={14} aria-hidden /> {t.stats.back} · {dateKeyFmt(history[history.length - 1].from)} – {dateKeyFmt(history[history.length - 1].to)}
         </button>
       ) : null}
 
@@ -362,7 +434,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
       <div className={`space-y-4 transition-opacity ${loading ? "opacity-60" : ""}`}>
         {data ? (
           <>
-            {/* KPI row: the two numbers that matter for any range come first. */}
+            {/* KPI row: the two numbers that matter for any period come first. */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               <Kpi
                 label={t.stats.avgSticksPerDay}
@@ -379,6 +451,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
               <Kpi label={t.stats.totalSessions} value={fmt.integer(data.totals.sessions)} delta={deltaText(data.totals.sessions, data.previous?.sessions)} hint={`${t.stats.totalRecords}: ${fmt.integer(data.totals.records)}`} />
               <Kpi label={t.stats.totalPuffs} value={fmt.integer(data.totals.puffs)} delta={deltaText(data.totals.puffs, data.previous?.puffs)} />
               <Kpi
+                className="col-span-2 md:col-span-1"
                 label={t.stats.stickDuration}
                 value={data.totals.avgLastPuffS == null ? "—" : `${fmt.number(Math.round(data.totals.avgLastPuffS / 6) / 10)} min`}
                 delta={data.totals.avgLastPuffS == null || data.previous?.avgLastPuffS == null ? null : deltaText(data.totals.avgLastPuffS, data.previous.avgLastPuffS)}
@@ -401,6 +474,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                     bars={series.map((d) => ({ key: `sessions:${d.serial}`, name: d.name, color: colorCss(d.color) }))}
                     average={avgPerBucket}
                     averageLabel={t.stats.averageLine}
+                    tickEvery={dataGroup === "hour" ? 3 : undefined}
                     onBar={(i) => data.buckets[i] && void openBucket(data.buckets[i])}
                   />
                 </Card>
@@ -411,27 +485,30 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                     lines={series.map((d) => ({ key: `pps:${d.serial}`, name: d.name, color: colorCss(d.color) }))}
                     average={data.totals.avgPuffsPerSession}
                     averageLabel={`${t.stats.averageLine} ${data.totals.avgPuffsPerSession == null ? "" : fmt.number(data.totals.avgPuffsPerSession)}`}
+                    tickEvery={dataGroup === "hour" ? 3 : undefined}
                     onPoint={(i) => data.buckets[i] && void openBucket(data.buckets[i])}
                   />
                 </Card>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card>
-                    <CardTitle right={<span className="text-xs text-muted">{t.stats.sticksPerDayShort}</span>}>{t.stats.byHour}</CardTitle>
-                    <DistributionChart
-                      rows={data.byHour.map((n, h) => ({ label: String(h).padStart(2, "0"), full: `${String(h).padStart(2, "0")}:00–${String(h).padStart(2, "0")}:59`, value: Math.round((n / Math.max(1, data.totals.daysInRange)) * 100) / 100, count: n }))}
-                      tickEvery={3}
-                      countLabel={t.stats.sticks}
-                    />
-                  </Card>
-                  <Card>
-                    <CardTitle right={<span className="text-xs text-muted">{t.stats.sticksPerDayShort}</span>}>{t.stats.byWeekday}</CardTitle>
-                    <DistributionChart
-                      rows={data.byWeekday.map((n, i) => ({ label: weekdayNames[i], full: weekdayNames[i], value: Math.round((n / Math.max(1, data.totals.daysInRange / 7)) * 100) / 100, count: n }))}
-                      tickEvery={1}
-                      countLabel={t.stats.sticks}
-                    />
-                  </Card>
-                </div>
+                {showDistributions ? (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Card>
+                      <CardTitle right={<span className="text-xs text-muted">{t.stats.sticksPerDayShort}</span>}>{t.stats.byHour}</CardTitle>
+                      <DistributionChart
+                        rows={data.byHour.map((n, h) => ({ label: String(h).padStart(2, "0"), full: `${String(h).padStart(2, "0")}:00–${String(h).padStart(2, "0")}:59`, value: Math.round((n / Math.max(1, data.totals.daysInRange)) * 100) / 100, count: n }))}
+                        tickEvery={3}
+                        countLabel={t.stats.sticks}
+                      />
+                    </Card>
+                    <Card>
+                      <CardTitle right={<span className="text-xs text-muted">{t.stats.sticksPerDayShort}</span>}>{t.stats.byWeekday}</CardTitle>
+                      <DistributionChart
+                        rows={Array.from({ length: 7 }, (_, i) => (i + weekStart - 1) % 7).map((i) => ({ label: weekdayNames[i], full: weekdayNames[i], value: Math.round((data.byWeekday[i] / Math.max(1, data.totals.daysInRange / 7)) * 100) / 100, count: data.byWeekday[i] }))}
+                        tickEvery={1}
+                        countLabel={t.stats.sticks}
+                      />
+                    </Card>
+                  </div>
+                ) : null}
 
                 {drill ? (
                   <Card>
@@ -442,7 +519,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                         </button>
                       }
                     >
-                      {f(t.stats.drillTitle, { period: bucketLabel(drill.bucket.key, dataGroup) })}
+                      {f(t.stats.drillTitle, { period: dataGroup === "hour" ? `${dateKeyFmt(drill.bucket.start)} ${bucketLabel(drill.bucket, "hour")}` : bucketLabel(drill.bucket, dataGroup) })}
                     </CardTitle>
                     {drill.items === null ? (
                       <div className="text-sm text-text-2">{t.common.loading}</div>
@@ -501,26 +578,28 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.records}</th>
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.sessions}</th>
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.puffs}</th>
-                          <th className="py-1.5 pr-3 text-right font-medium">{t.stats.avgSticksPerDay}</th>
+                          {dataGroup !== "hour" ? <th className="py-1.5 pr-3 text-right font-medium">{t.stats.avgSticksPerDay}</th> : null}
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.avgPuffsPerStick}</th>
                           <th className="py-1.5 text-right font-medium">{t.stats.stickDurationShort}</th>
                         </tr>
                       </thead>
                       <tbody className="tabular">
-                        {data.buckets.map((b) => (
-                          <tr key={b.key} className="cursor-pointer border-t border-border hover:bg-surface-2" onClick={() => openBucket(b)}>
-                            <td className="py-1.5 pr-3">
-                              {bucketLabel(b.key, dataGroup)}
-                              {b.suspect ? <span title={t.device.clockSuspect}> ⚠</span> : null}
-                            </td>
-                            <td className="py-1.5 pr-3 text-right">{fmt.integer(b.records)}</td>
-                            <td className="py-1.5 pr-3 text-right">{fmt.integer(b.sessions)}</td>
-                            <td className="py-1.5 pr-3 text-right">{fmt.integer(b.puffs)}</td>
-                            <td className="py-1.5 pr-3 text-right">{fmt.number(Math.round((b.sessions / b.days) * 100) / 100)}</td>
-                            <td className="py-1.5 pr-3 text-right">{b.sessions ? fmt.number(Math.round((b.puffs / b.sessions) * 10) / 10) : "—"}</td>
-                            <td className="py-1.5 text-right">{b.avgLastPuffS == null ? "—" : `${fmt.number(Math.round(b.avgLastPuffS / 6) / 10)} min`}</td>
-                          </tr>
-                        ))}
+                        {data.buckets
+                          .filter((b) => dataGroup !== "hour" || b.records > 0)
+                          .map((b) => (
+                            <tr key={b.key} className="cursor-pointer border-t border-border hover:bg-surface-2" onClick={() => openBucket(b)}>
+                              <td className="py-1.5 pr-3">
+                                {bucketLabel(b, dataGroup)}
+                                {b.suspect ? <span title={t.device.clockSuspect}> ⚠</span> : null}
+                              </td>
+                              <td className="py-1.5 pr-3 text-right">{fmt.integer(b.records)}</td>
+                              <td className="py-1.5 pr-3 text-right">{fmt.integer(b.sessions)}</td>
+                              <td className="py-1.5 pr-3 text-right">{fmt.integer(b.puffs)}</td>
+                              {dataGroup !== "hour" ? <td className="py-1.5 pr-3 text-right">{fmt.number(Math.round((b.sessions / b.days) * 100) / 100)}</td> : null}
+                              <td className="py-1.5 pr-3 text-right">{b.sessions ? fmt.number(Math.round((b.puffs / b.sessions) * 10) / 10) : "—"}</td>
+                              <td className="py-1.5 text-right">{b.avgLastPuffS == null ? "—" : `${fmt.number(Math.round(b.avgLastPuffS / 6) / 10)} min`}</td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   </div>
@@ -538,9 +617,9 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
 }
 
 /** Stat tile with an optional delta against the previous period. */
-function Kpi({ label, value, delta, hint }: { label: string; value: string; delta?: string | null; hint?: string }) {
+function Kpi({ label, value, delta, hint, className = "" }: { label: string; value: string; delta?: string | null; hint?: string; className?: string }) {
   return (
-    <div className="ui-card px-4 py-3">
+    <div className={`ui-card px-4 py-3 ${className}`}>
       <div className="text-xs text-text-2">{label}</div>
       <div className="mt-1 text-2xl font-semibold">{value}</div>
       {delta ? <div className="mt-0.5 text-xs text-text-2">{delta}</div> : null}
@@ -556,17 +635,18 @@ interface SeriesDef {
   color: string;
 }
 
-function useTickInterval(ref: React.RefObject<HTMLDivElement | null>, count: number): number {
+function useTickInterval(ref: React.RefObject<HTMLDivElement | null>, count: number, fixed?: number): number {
   const width = useElementWidth(ref);
+  if (fixed) return fixed - 1;
   const maxTicks = Math.max(3, Math.floor((width || 600) / 72));
   return count > maxTicks ? Math.ceil(count / maxTicks) - 1 : 0;
 }
 
 /** Stacked columns per device with the per-bucket average and the peak labelled. */
-const SticksChart = memo(function SticksChart({ rows, bars, average, averageLabel, onBar }: { rows: ChartRow[]; bars: SeriesDef[]; average: number; averageLabel: string; onBar: (index: number) => void }) {
+const SticksChart = memo(function SticksChart({ rows, bars, average, averageLabel, tickEvery, onBar }: { rows: ChartRow[]; bars: SeriesDef[]; average: number; averageLabel: string; tickEvery?: number; onBar: (index: number) => void }) {
   const fmt = useFormat();
   const ref = useRef<HTMLDivElement>(null);
-  const interval = useTickInterval(ref, rows.length);
+  const interval = useTickInterval(ref, rows.length, tickEvery);
   const peak = rows.reduce((best, r, i) => (Number(r.sessions) > Number(rows[best]?.sessions ?? -1) ? i : best), 0);
   const last = bars[bars.length - 1];
   return (
@@ -620,10 +700,10 @@ const SticksChart = memo(function SticksChart({ rows, bars, average, averageLabe
 });
 
 /** Puffs per stick is a rate: lines with ringed markers, the overall average as a reference. */
-const PuffsPerStickChart = memo(function PuffsPerStickChart({ rows, lines, average, averageLabel, onPoint }: { rows: ChartRow[]; lines: SeriesDef[]; average: number | null; averageLabel: string; onPoint: (index: number) => void }) {
+const PuffsPerStickChart = memo(function PuffsPerStickChart({ rows, lines, average, averageLabel, tickEvery, onPoint }: { rows: ChartRow[]; lines: SeriesDef[]; average: number | null; averageLabel: string; tickEvery?: number; onPoint: (index: number) => void }) {
   const fmt = useFormat();
   const ref = useRef<HTMLDivElement>(null);
-  const interval = useTickInterval(ref, rows.length);
+  const interval = useTickInterval(ref, rows.length, tickEvery);
   const many = rows.length > 40;
   return (
     <div ref={ref} className="h-52 w-full sm:h-64">

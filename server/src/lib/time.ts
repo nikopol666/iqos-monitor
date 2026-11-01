@@ -57,13 +57,24 @@ export function isoWeekKey(dateKey: string): string {
   return `${date.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-/** Monday of the ISO week containing the date key. */
-export function isoWeekStart(dateKey: string): string {
+/** First day of the week containing the date key; firstDay 1 = Monday … 7 = Sunday. */
+export function weekStartOf(dateKey: string, firstDay: number = 1): string {
   const [y, m, d] = dateKey.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
   const dayNum = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() - (dayNum - 1));
+  date.setUTCDate(date.getUTCDate() - ((dayNum - firstDay + 7) % 7));
   return date.toISOString().slice(0, 10);
+}
+
+/** Monday of the ISO week containing the date key. */
+export function isoWeekStart(dateKey: string): string {
+  return weekStartOf(dateKey, 1);
+}
+
+/** Last calendar day of the month of the date key. */
+export function monthEnd(dateKey: string): string {
+  const [y, m] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 }
 
 export function addDays(dateKey: string, n: number): string {

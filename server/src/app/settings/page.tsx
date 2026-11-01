@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { getDb, schema } from "@/db";
 import { listDevicesLabeled, listUsers } from "@/lib/queries";
 import { LOCALE_COOKIE } from "@/lib/i18n";
+import { getWeekStartOverride } from "@/lib/prefs-server";
 import { SettingsClient } from "@/components/settings-client";
 import { DEVICE_VARIANTS, defaultColorFor } from "@/lib/variants";
 import { PALETTE } from "@/lib/palette";
@@ -21,6 +22,7 @@ export default async function SettingsPage() {
     .orderBy(schema.agents.id)
     .all();
   const override = (await cookies()).get(LOCALE_COOKIE)?.value ?? null;
+  const weekStartOverride = await getWeekStartOverride();
   return (
     <SettingsClient
       users={listUsers()}
@@ -38,6 +40,7 @@ export default async function SettingsPage() {
       variants={DEVICE_VARIANTS}
       palette={PALETTE}
       agents={agents}
+      weekStartOverride={weekStartOverride}
       envKeyConfigured={!!process.env.AGENT_API_KEY}
       override={override}
     />

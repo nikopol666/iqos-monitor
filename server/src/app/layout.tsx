@@ -5,6 +5,7 @@ import "./globals.css";
 import { getT } from "@/lib/i18n/server";
 import { LOCALE_COOKIE } from "@/lib/i18n";
 import { I18nProvider } from "@/lib/i18n/client";
+import { getWeekStart } from "@/lib/prefs-server";
 import { DISPLAY_TZ } from "@/lib/time";
 import { Nav } from "@/components/nav";
 import { THEME_COOKIE, parseThemePref } from "@/lib/theme";
@@ -27,7 +28,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} data-theme={theme === "auto" ? undefined : theme}>
       <body className="flex min-h-full flex-col">
-        <I18nProvider value={{ t, locale, tz: DISPLAY_TZ }}>
+        <I18nProvider value={{ t, locale, tz: DISPLAY_TZ, weekStart: await getWeekStart() }}>
           <Nav override={override} theme={theme} />
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">{children}</main>
         </I18nProvider>

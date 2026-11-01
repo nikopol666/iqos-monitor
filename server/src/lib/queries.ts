@@ -187,6 +187,8 @@ export interface StatsQuery {
   groupBy: GroupBy;
   /** Drop records flagged as clock suspects. */
   excludeSuspect?: boolean;
+  /** First day of the week, 1 = Monday … 7 = Sunday. */
+  weekStart?: number;
 }
 
 function isoNoMs(d: Date): string {
@@ -204,7 +206,7 @@ function previousTotals(q: StatsQuery): StatTotals {
 export function statsFor(q: StatsQuery, withPrevious = true): StatsResult & { suspectHidden: number; previous: StatTotals | null } {
   const db = getDb();
   const previous = withPrevious ? previousTotals(q) : null;
-  if (!q.serials.length) return { ...computeStats([], q.from, q.to, q.groupBy, DISPLAY_TZ), suspectHidden: 0, previous };
+  if (!q.serials.length) return { ...computeStats([], q.from, q.to, q.groupBy, DISPLAY_TZ, q.weekStart ?? 1), suspectHidden: 0, previous };
   const { startUtc, endUtcExclusive } = localDayRangeUtc(q.from, q.to);
   const rows = db
     .select({
@@ -238,7 +240,7 @@ export function statsFor(q: StatsQuery, withPrevious = true): StatsResult & { su
         .get(...q.serials, isoNoMs(startUtc), isoNoMs(endUtcExclusive)) as { n: number }
     ).n;
   }
-  return { ...computeStats(rows, q.from, q.to, q.groupBy, DISPLAY_TZ), suspectHidden, previous };
+  return { ...computeStats(rows, q.from, q.to, q.groupBy, DISPLAY_TZ, q.weekStart ?? 1), suspectHidden, previous };
 }
 
 function safeSpan(json: string | null | undefined): { first: number; last: number } | null {

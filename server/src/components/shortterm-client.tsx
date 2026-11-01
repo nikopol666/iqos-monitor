@@ -21,7 +21,7 @@ function delta(now: number, before: number): string {
 
 /** Today / this week at a glance for one user (or all); refreshes every minute. */
 export function ShortTermClient({ initial, userId, initialIncludeToday = false }: { initial: Payload | null; userId: number | "all"; initialIncludeToday?: boolean }) {
-  const { t, f } = useI18n();
+  const { t, f, weekStart } = useI18n();
   const fmt = useFormat();
   const [includeToday, setIncludeToday] = useState(initialIncludeToday);
   // The initial payload matches the initial switch position only.
@@ -35,7 +35,7 @@ export function ShortTermClient({ initial, userId, initialIncludeToday = false }
     let last = "";
     const load = async (force: boolean) => {
       try {
-        const res = await fetch(`/api/shortterm?user=${userId}&today=${includeToday ? 1 : 0}`, { cache: "no-store" });
+        const res = await fetch(`/api/shortterm?user=${userId}&today=${includeToday ? 1 : 0}&week_start=${weekStart}`, { cache: "no-store" });
         if (!res.ok || !active) return;
         const next = (await res.json()) as Payload;
         const json = JSON.stringify(next);
@@ -59,7 +59,7 @@ export function ShortTermClient({ initial, userId, initialIncludeToday = false }
       active = false;
       clearInterval(id);
     };
-  }, [initial, userId, includeToday]);
+  }, [initial, userId, includeToday, weekStart]);
 
   function toggleToday(next: boolean) {
     setIncludeToday(next);

@@ -8,6 +8,8 @@ interface I18nValue {
   t: Dictionary;
   locale: string;
   tz: string;
+  /** First day of the week for this viewer, 1 = Monday … 7 = Sunday. */
+  weekStart: number;
 }
 
 const I18nContext = createContext<I18nValue | null>(null);

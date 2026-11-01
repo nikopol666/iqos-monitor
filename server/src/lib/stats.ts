@@ -1,8 +1,8 @@
-import { addDays, daysBetweenInclusive, isoWeekKey, isoWeekStart, localParts, monthKey, DISPLAY_TZ } from "./time";
+import { addDays, daysBetweenInclusive, localParts, monthKey, weekStartOf, DISPLAY_TZ } from "./time";
 
 import { puffSpan } from "./protocol/history";
 
-export type GroupBy = "day" | "week" | "month";
+export type GroupBy = "hour" | "day" | "week" | "month";
 
 export interface StatRow {
   serial: string;
@@ -61,9 +61,11 @@ export interface StatsResult {
   byWeekday: number[];
 }
 
-function bucketKeyFor(dateKey: string, groupBy: GroupBy): string {
+/** Bucket key: the day, the week's first day, the month, or day + hour ("YYYY-MM-DDTHH"). */
+function bucketKeyFor(dateKey: string, groupBy: GroupBy, firstDay: number, hour = 0): string {
+  if (groupBy === "hour") return `${dateKey}T${String(hour).padStart(2, "0")}`;
   if (groupBy === "day") return dateKey;
-  if (groupBy === "week") return isoWeekKey(dateKey);
+  if (groupBy === "week") return weekStartOf(dateKey, firstDay);
   return monthKey(dateKey);
 }
 
@@ -77,14 +79,21 @@ function round2(n: number): number {
  * continuous. "records" = timestamped archive entries, "sessions" = records
  * with at least one decoded puff event, "puffs" = sum of decoded puff counts.
  */
-export function computeStats(rows: StatRow[], from: string, to: string, groupBy: GroupBy, tz: string = DISPLAY_TZ): StatsResult {
+export function computeStats(rows: StatRow[], from: string, to: string, groupBy: GroupBy, tz: string = DISPLAY_TZ, firstDay: number = 1): StatsResult {
   const buckets = new Map<string, Bucket>();
   // Pre-create buckets for the whole range.
   for (let day = from; day <= to; day = addDays(day, 1)) {
-    const key = bucketKeyFor(day, groupBy);
+    if (groupBy === "hour") {
+      for (let h = 0; h < 24; h++) {
+        const key = bucketKeyFor(day, "hour", firstDay, h);
+        buckets.set(key, { key, start: day, end: day, days: 1, records: 0, sessions: 0, puffs: 0, suspect: 0, avgLastPuffS: null, perSerial: {} });
+      }
+      continue;
+    }
+    const key = bucketKeyFor(day, groupBy, firstDay);
     let b = buckets.get(key);
     if (!b) {
-      const start = groupBy === "week" ? isoWeekStart(day) : groupBy === "month" ? day.slice(0, 7) + "-01" : day;
+      const start = groupBy === "week" ? weekStartOf(day, firstDay) : groupBy === "month" ? day.slice(0, 7) + "-01" : day;
       b = { key, start: start < from ? from : start, end: day, days: 0, records: 0, sessions: 0, puffs: 0, suspect: 0, avgLastPuffS: null, perSerial: {} };
       buckets.set(key, b);
     }
@@ -111,7 +120,7 @@ export function computeStats(rows: StatRow[], from: string, to: string, groupBy:
       byHour[parts.hour]++;
       byWeekday[(new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay() + 6) % 7]++;
     }
-    const b = buckets.get(bucketKeyFor(day, groupBy));
+    const b = buckets.get(bucketKeyFor(day, groupBy, firstDay, parts.hour));
     if (!b) continue;
     activeDays.add(day);
     const isSession = (row.puffCount ?? 0) > 0;

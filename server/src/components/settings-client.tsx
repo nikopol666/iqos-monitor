@@ -7,6 +7,7 @@ import type { User } from "@/db/schema";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import { DICTIONARIES, SUPPORTED_LOCALES } from "@/lib/i18n";
 import { Card, CardTitle, Notice } from "@/components/ui";
+import { defaultWeekStart } from "@/lib/prefs";
 import { DeviceImage } from "@/components/device-image";
 import type { DeviceVariant } from "@/lib/variants";
 import { colorCss, isHexColor, lowContrastModes, type PaletteColor } from "@/lib/palette";
@@ -45,6 +46,7 @@ export function SettingsClient({
   agents,
   envKeyConfigured,
   override,
+  weekStartOverride,
 }: {
   users: User[];
   devices: DeviceRow[];
@@ -53,9 +55,13 @@ export function SettingsClient({
   agents: AgentRow[];
   envKeyConfigured: boolean;
   override: string | null;
+  weekStartOverride: string | null;
 }) {
-  const { t, f } = useI18n();
+  const { t, f, weekStart, locale } = useI18n();
   const fmt = useFormat();
+  // Weekday names in the viewer's language; 2024-01-01 is a Monday.
+  const weekdayName = (n: number) => new Intl.DateTimeFormat(locale === "cs" ? "cs-CZ" : "en-GB", { weekday: "long" }).format(new Date(Date.UTC(2024, 0, n, 12)));
+  const languageWeekStart = defaultWeekStart(locale);
   const router = useRouter();
   const [newUser, setNewUser] = useState("");
   const [newUserColor, setNewUserColor] = useState("#2a78d6");
@@ -270,6 +276,22 @@ export function SettingsClient({
             <KeyRound size={16} aria-hidden /> {t.settings.generateKey}
           </button>
         </form>
+      </Card>
+
+      <Card>
+        <CardTitle>{t.settings.display}</CardTitle>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs text-text-2">{t.settings.weekStart}</span>
+          <select className="ui-input" value={weekStartOverride ?? ""} onChange={(e) => run(() => call("/api/prefs", "POST", { week_start: e.target.value ? Number(e.target.value) : null }))}>
+            <option value="">{f(t.settings.weekStartAuto, { day: weekdayName(languageWeekStart) })}</option>
+            {[1, 6, 7].map((n) => (
+              <option key={n} value={n}>
+                {weekdayName(n)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="mt-2 text-xs text-muted">{f(t.settings.weekStartHint, { day: weekdayName(weekStart) })}</p>
       </Card>
 
       <Card>
