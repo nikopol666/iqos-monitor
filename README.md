@@ -1,100 +1,171 @@
 # IQOS Monitor
 
-Long-term usage statistics and live status for IQOS ILUMA i ONE devices.
-Two parts:
+Self-hosted usage statistics and live status for IQOS ILUMA i ONE devices.
+A small Windows tray agent reads the device over USB, a web app on your own
+server keeps the history and shows it: sticks per day, puffs per stick, how
+long a stick lasts, when during the day you smoke, battery and charging live,
+and the device settings the official app offers, all without a cloud account.
 
-| Part | What it is | Where it runs |
-|---|---|---|
-| `agent/` | Lightweight Windows tray application (Python). Reads the device over USB HID (read-only), stores raw frames locally, uploads them to the server, streams live state every second while a device is plugged in. | Any Windows PC the IQOS gets plugged into |
-| `server/` | Web application (Next.js + TypeScript) with SQLite in a single Docker container. Overview with live cards, statistics (day / week / month, averages per day), device detail with full-history download, user profiles. | Linux Docker host on the LAN |
-
-Everything stays on the local network. No cloud, no login; users are simple
+Everything stays on your network. There is no login; people are simple
 profiles that group devices.
 
-Protocol notes and what is verified vs. experimental: [PROTOCOL.md](PROTOCOL.md).
-The original standalone v0.5 tooling is kept in `IQOS-History/` for reference.
+![Overview](docs/screenshots/overview.png)
 
-## Server
+## What it does
 
-```bash
-cd server
-npm ci
-npm test            # protocol decoders against test-vectors/, stats, ingest
-npm run dev         # http://localhost:3000, SQLite in ~/IQOS Monitor/iqos.sqlite3
+- **Overview for one person**: connected devices with live battery, today's
+  sticks and puffs, "this week" at a glance and the last seven full days.
+- **Statistics** by day (hour by hour), week or month with arrows to page
+  through time, or any date range with the usual presets. Sticks per day,
+  puffs per stick, stick duration, totals, deltas against the previous
+  period, distribution by hour of day and by weekday, and a table you can
+  drill into down to single records.
+- **Device page**: diagnostics (firmware, battery, temperature, lifetime
+  counters, with a mark on anything not yet independently verified), the
+  full archive of records with puff counts and durations, suspicious or
+  invalid records you can delete or block, and the device settings:
+  FlexPuff, LED brightness, AutoStart, Smart Gesture, the four vibration
+  events, lock, find-my-IQOS and restart.
+- **Several people, several devices**, each device with the official product
+  render of its finish and its own chart colour.
+- English and Czech, light and dark theme, phone-friendly.
+
+| Statistics | Device | Phone |
+|---|---|---|
+| ![Statistics](docs/screenshots/statistics.png) | ![Device](docs/screenshots/device.png) | ![Phone](docs/screenshots/overview-phone.png) |
+
+## How it works
+
+```
+IQOS ──USB HID──▶ Agent (Windows tray, Python) ──HTTP, API key──▶ Server (Next.js + SQLite, Docker)
+                                                                         ▲
+                                                 browsers on the LAN ────┘
 ```
 
-Environment: `DATABASE_PATH` (default `~/IQOS Monitor/iqos.sqlite3`; keep it outside the project tree, the dev watcher reloads on every write otherwise), `DISPLAY_TZ`
-(default `Europe/Prague`), optional `AGENT_API_KEY` (a fixed key every agent may
-use; otherwise generate keys in *Settings → Agents*). Language follows the
-browser (`Accept-Language`), overridable in the header; English is the default,
-Czech is included. To add a language, create `src/lib/i18n/<code>.ts` and
-register it in `src/lib/i18n/index.ts`.
+- The **agent** watches USB for any IQOS (vendor `2759`, product `0003`).
+  When one appears it takes a diagnostics snapshot, asks the server which
+  archive records it still lacks, reads exactly those from the device and
+  posts them, then streams the live state every second and looks for new
+  records every five seconds while the device stays plugged in. It keeps no
+  database of its own: the server is the only store, and if the server is
+  unreachable the agent simply reads again next time.
+- The **server** decodes the raw frames (so a better decoder can re-interpret
+  everything already stored), computes the statistics, serves the web app and
+  hands jobs to the agent: *download full history* and setting changes.
+- Only frames captured from the official application are ever written to a
+  device; firmware updates and resets are never issued. The decoding and the
+  evidence behind every value are documented in [docs/protocol.md](docs/protocol.md).
 
-#Device images: `server/public/devices/*.png` are official IQOS product renders
-(all six ILUMA i ONE finishes plus ILUMA i and ILUMA i PRIME). Pick the model
-and finish per device in *Settings → Devices*; the chart colour is separate and
-defaults to a readable palette slot. To add a finish, drop a transparent PNG
-there and register it in `server/src/lib/variants.ts`.
+## Install the server
 
-## Docker
+Requirements: a Docker host on your LAN (Linux x86-64 images are published).
 
 ```bash
-# on the Docker host, in a folder holding docker-compose.yml from this repo
-echo "GHCR_OWNER=<github-user>" > .env     # image: ghcr.io/<github-user>/iqos-monitor:latest
-docker login ghcr.io                       # PAT with read:packages (private image)
+mkdir iqos-monitor && cd iqos-monitor
+curl -LO https://raw.githubusercontent.com/nikopol666/iqos/main/docker-compose.yml
+echo "GHCR_OWNER=nikopol666" > .env
 docker compose pull
 docker compose up -d
 ```
 
-Data lives in the `iqos-data` volume (`/data/iqos.sqlite3`). To build on the host instead of pulling:
+Open `http://<host>:3000`. The database lives in the `iqos-data` volume
+(`/data/iqos.sqlite3`); a bind mount works too, the container fixes the
+directory permissions itself at start.
+
+Environment variables (see `docker-compose.yml`):
+
+| variable | default | meaning |
+|---|---|---|
+| `TZ`, `DISPLAY_TZ` | `Europe/Prague` | time zone for days and weeks |
+| `AGENT_API_KEY` | unset | a fixed key every agent may use; otherwise create keys in *Settings → Agents* |
+| `IQOS_PORT` | `3000` | published port |
+| `IQOS_TAG` | `latest` | image tag |
+
+Behind a reverse proxy with single sign-on, leave `/api/agent/` reachable
+without the SSO layer: that is the only path the agent uses, and it
+authenticates with its API key. Everything else can sit behind the login.
+
+To build the image on the host instead of pulling it:
 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
 
-### A new or restored server
+## Install the agent (Windows)
 
-Nothing has to be copied. The agent asks the server which archive IDs it lacks
-and reads them from the device again (last 3 months on first contact; the whole
-archive via *Download full history* on the device page). Users, device names,
-finishes and colours are the only thing a fresh database does not get back:
-set them again in *Settings*.
+1. Download `IQOS-Agent.exe` from the latest [release](https://github.com/nikopol666/iqos/releases)
+   and run it. A tray icon appears and the settings window opens on first start.
+2. Enter the server address (`http://<host>:3000` or your HTTPS name) and an
+   API key from *Settings → Agents* on the web (or the fixed `AGENT_API_KEY`),
+   press *Test*, then *Save*.
+3. Plug in the IQOS. The device shows up on the web within seconds; the last
+   three months of records are read on first contact. Use *Download full
+   history* on the device page for everything older.
+4. Optionally tick *Start with Windows* in the tray menu.
 
-## Agent
+Settings are kept in `%APPDATA%\IQOS Agent\config.json`, the log in
+`%APPDATA%\IQOS Agent\agent.log`. The agent speaks English or Czech following
+Windows, overridable in its settings.
 
-```powershell
+**Windows 11 Smart App Control** may refuse to run the unsigned executable
+after a download. In that case run the agent from source: install Python 3,
+`pip install -r agent/requirements.txt`, and double-click
+`agent\run_agent.vbs` (it starts `pythonw.exe` without a console; the tray's
+*Start with Windows* registers that launcher).
+
+## Daily use
+
+- The **overview** is one person's page; pick the person at the top when
+  there are several. The 7-day card excludes today by default because today
+  is not over; a switch includes it.
+- **Statistics** remember nothing but what you choose; the week start follows
+  the language and can be set per browser in *Settings → Display*.
+- A device's **finish, colour, name and owner** are set in *Settings → Devices*.
+- **Faulty records** (invalid reads or a suspicious clock) can be deleted
+  from the device page. A deleted record is not read again automatically but
+  returns with a full history download; a blocked one is never read again.
+
+## Supported devices
+
+Tested on two ILUMA i ONE (model `42PT`). Other IQOS models with the same USB
+interface may work for live data; their archive format has not been checked.
+Contributions with captures from other models are welcome.
+
+## Development
+
+```bash
+# server
+cd server && npm ci
+npm test          # decoders against test-vectors/, statistics, ingest
+npm run dev       # http://localhost:3000, database in ~/IQOS Monitor/
+
+# agent
 cd agent
-py -3 -m pip install -r requirements.txt
+py -3 -m pip install -r requirements-dev.txt
 py -3 run_tests.py
-py -3 -m iqos_agent            # tray icon; first start opens Settings
-py -3 -m iqos_agent --console  # debug mode, logs to stdout
-.\build_agent.ps1              # dist\IQOS-Agent.exe (PyInstaller, no console)
+py -3 -m iqos_agent --console
+.\build_agent.ps1   # dist\IQOS-Agent.exe
 ```
 
-**Windows 11 Smart App Control** blocks unsigned executables such as the
-PyInstaller build. On such machines run the agent from source instead:
-double-click `agent\run_agent.vbs` (starts the signed `pythonw.exe` without a
-console; requires Python 3 and `pip install -r requirements.txt`). The
-"Start with Windows" switch in the tray menu registers that launcher.
+`test-vectors/` holds real frames captured from the two test devices; both
+the TypeScript and the Python decoders are tested against them. GitHub
+Actions builds the server image into GHCR on every push to `main` and
+attaches `IQOS-Agent.exe` to tagged releases (`v*`).
 
-Settings are stored in `%APPDATA%\IQOS Agent\config.json` (server address,
-API key, language, autostart). The agent keeps **no database**: the server
-answers which archive IDs it still lacks (`GET /api/agent/devices/{serial}/sync`),
-the agent reads exactly those from the device and posts them in batches. If the
-server is unreachable the sync stops and the next attempt reads again; nothing
-is buffered on the PC. Log: `%APPDATA%\IQOS Agent\agent.log`.
+Research tools for new captures live in `agent/tools/` (`pcap_scp.py`
+extracts SCP frames from a USBPcap file, `eventlog.py` dumps the device's
+event log read-only).
 
-Behaviour: any IQOS (USB `2759:0003`) is accepted and registered on the server
-as unassigned. On connect the agent takes a diagnostics snapshot, syncs the last
-3 months of archive records (incrementally afterwards), and reads live state
-every second. *Download full history* in the web UI queues a job the agent runs
-in the background with progress reporting; unplugging keeps what was read.
+## Credits
 
-## GitHub Actions
+The register map started from [iqos-bar](https://github.com/pavelkrejci/iqos-bar)
+and [iqos-scope](https://github.com/pavelkrejci/iqos-scope); the shared
+BLE/USB framing and the settings command set were confirmed with
+[okhsunrog/iqos](https://github.com/okhsunrog/iqos),
+[hauntedfail/iqos](https://github.com/hauntedfail/iqos) and
+[kuroiko0429/iqosctl](https://github.com/kuroiko0429/iqosctl). Device renders
+are the official IQOS product images.
 
-- `server.yml` – typecheck, lint, tests, then builds `ghcr.io/<owner>/iqos-monitor` (amd64).
-- `agent.yml` – runs the Python tests on Windows and builds `IQOS-Agent.exe` (artifact; attached to `v*` releases).
+IQOS is a trademark of Philip Morris Products S.A. This project is not
+affiliated with or endorsed by them.
 
-## Read-only policy
+## License
 
-The agent only issues commands captured from the official application or
-classic register reads verified on two devices. No settings writes, no firmware,
-no reset. Device configuration from the web UI is a planned later phase and
-will require newly captured and verified commands.
+[MIT](LICENSE)

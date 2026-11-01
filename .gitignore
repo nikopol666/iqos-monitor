@@ -20,3 +20,9 @@ Thumbs.db
 # legacy standalone package stays as reference only
 IQOS-History/__pycache__/
 agent/dist_new/
+
+# research notes, captures and the legacy tooling stay local (see docs/ for the public documentation)
+notes/
+IQOS-History/
+*.pcapng
+server/AGENTS.md
