@@ -13,8 +13,10 @@ export interface DayPoint {
 export interface ShortTermStats {
   today: string;
   weekStart: string;
-  /** Last 7 calendar days including today, oldest first. */
+  /** Last 7 calendar days, oldest first; ends today or yesterday (see includesToday). */
   days: DayPoint[];
+  /** False (default): the 7-day window ends yesterday because today is not over yet. */
+  includesToday: boolean;
   totals: {
     today: { sessions: number; puffs: number };
     yesterday: { sessions: number; puffs: number };
@@ -39,15 +41,17 @@ function isoNoMs(d: Date): string {
   return d.toISOString().replace(/\.\d{3}Z$/, "+00:00");
 }
 
-export function shortTermStats(serials: string[], tz: string = DISPLAY_TZ): ShortTermStats {
+export function shortTermStats(serials: string[], tz: string = DISPLAY_TZ, includeToday = false): ShortTermStats {
   const today = todayKey(tz);
   const weekStart = isoWeekStart(today);
   const lastWeekStart = addDays(weekStart, -7);
   const from = addDays(today, -13) < lastWeekStart ? addDays(today, -13) : lastWeekStart;
+  const last7End = includeToday ? today : addDays(today, -1);
   const empty = (): ShortTermStats => ({
     today,
     weekStart,
     days: [],
+    includesToday: includeToday,
     totals: {
       today: { sessions: 0, puffs: 0 },
       yesterday: { sessions: 0, puffs: 0 },
@@ -60,7 +64,7 @@ export function shortTermStats(serials: string[], tz: string = DISPLAY_TZ): Shor
   });
   const result = empty();
   for (let i = 6; i >= 0; i--) {
-    const day = addDays(today, -i);
+    const day = addDays(last7End, -i);
     result.days.push({ day, perSerial: {}, sessions: 0, puffs: 0 });
   }
   for (const s of serials) result.perSerial[s] = { today: { sessions: 0, puffs: 0 }, week: { sessions: 0, puffs: 0 } };

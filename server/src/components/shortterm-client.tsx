@@ -9,6 +9,7 @@ import { colorCss } from "@/lib/palette";
 import { Card, CardTitle, Stat } from "@/components/ui";
 
 export type ShortTermPayload = ShortTermStats & { devices: { serial: string; name: string; color: string }[] };
+export const SHORT_TODAY_COOKIE = "short_today";
 type Payload = ShortTermPayload;
 type Row = Record<string, string | number>;
 
@@ -19,17 +20,19 @@ function delta(now: number, before: number): string {
 }
 
 /** Today / this week at a glance for one user (or all); refreshes every minute. */
-export function ShortTermClient({ initial, userId }: { initial: Payload | null; userId: number | "all" }) {
+export function ShortTermClient({ initial, userId, initialIncludeToday = false }: { initial: Payload | null; userId: number | "all"; initialIncludeToday?: boolean }) {
   const { t, f } = useI18n();
   const fmt = useFormat();
+  const [includeToday, setIncludeToday] = useState(initialIncludeToday);
+  // The initial payload matches the initial switch position only.
   const [data, setData] = useState(initial);
 
   useEffect(() => {
     let active = true;
-    let last = initial ? JSON.stringify(initial) : "";
+    let last = initial && includeToday === initialIncludeToday ? JSON.stringify(initial) : "";
     const load = async () => {
       try {
-        const res = await fetch(`/api/shortterm?user=${userId}`, { cache: "no-store" });
+        const res = await fetch(`/api/shortterm?user=${userId}&today=${includeToday ? 1 : 0}`, { cache: "no-store" });
         if (!res.ok || !active) return;
         const next = (await res.json()) as Payload;
         const json = JSON.stringify(next);
@@ -41,13 +44,22 @@ export function ShortTermClient({ initial, userId }: { initial: Payload | null; 
         /* keep last */
       }
     };
-    if (!initial) void load();
+    if (!initial || includeToday !== initialIncludeToday) void load();
     const id = setInterval(load, 60_000);
     return () => {
       active = false;
       clearInterval(id);
     };
-  }, [initial, userId]);
+  }, [initial, userId, includeToday, initialIncludeToday]);
+
+  function toggleToday(next: boolean) {
+    setIncludeToday(next);
+    try {
+      document.cookie = `${SHORT_TODAY_COOKIE}=${next ? 1 : 0}; path=/; max-age=31536000; samesite=lax`;
+    } catch {
+      /* cookie blocked: lasts for this page only */
+    }
+  }
 
   const shortDateKey = fmt.shortDateKey;
   const dateKey = fmt.dateKey;
@@ -87,7 +99,19 @@ export function ShortTermClient({ initial, userId }: { initial: Payload | null; 
         <Stat label={t.short.weekPuffsPerStick} value={fmt.number(tot.derived.weekPuffsPerStick)} hint={`${t.short.lastWeek}: ${fmt.number(tot.derived.lastWeekPuffsPerStick)}`} />
       </div>
       <Card>
-        <CardTitle right={<span className="text-xs text-muted">{f(t.short.avg7, { sticks: fmt.number(tot.avg7.sessions), puffs: fmt.number(tot.derived.avg7PuffsPerStick) })}</span>}>{t.short.last7}</CardTitle>
+        <CardTitle
+          right={
+            <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-muted">
+              <span>{f(t.short.avg7, { sticks: fmt.number(tot.avg7.sessions), puffs: fmt.number(tot.derived.avg7PuffsPerStick) })}</span>
+              <label className="inline-flex cursor-pointer items-center gap-1.5 text-text-2">
+                <input type="checkbox" checked={includeToday} onChange={(e) => toggleToday(e.target.checked)} />
+                {t.short.includeToday}
+              </label>
+            </span>
+          }
+        >
+          {data.includesToday ? t.short.last7 : t.short.last7ToYesterday}
+        </CardTitle>
         <div className="grid gap-4 md:grid-cols-2">
           <MiniChart title={t.stats.sticks} prefix="s" rows={rows} devices={data.devices} />
           <MiniChart title={t.short.puffsPerStick} prefix="p" rows={rows} devices={data.devices} stacked={false} />

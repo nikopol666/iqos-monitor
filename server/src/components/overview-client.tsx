@@ -25,7 +25,7 @@ interface UserOpt {
  * The chosen user is kept in a cookie so the next visit (and the server
  * render) starts on the same person. "All" exists for unassigned devices.
  */
-export function OverviewClient({ initial, users, initialUser, week }: { initial: DeviceOverview[]; users: UserOpt[]; initialUser: OverviewUser; week: ShortTermPayload | null }) {
+export function OverviewClient({ initial, users, initialUser, week, includeToday }: { initial: DeviceOverview[]; users: UserOpt[]; initialUser: OverviewUser; week: ShortTermPayload | null; includeToday: boolean }) {
   const { t } = useI18n();
   const [devices, setDevices] = useState(initial);
   const [userId, setUserId] = useState<OverviewUser>(initialUser);
@@ -115,7 +115,7 @@ export function OverviewClient({ initial, users, initialUser, week }: { initial:
           </div>
         </section>
       ) : null}
-      {shown.length ? <ShortTermClient key={String(userId)} initial={userId === initialUser ? week : null} userId={userId} /> : null}
+      {shown.length ? <ShortTermClient key={String(userId)} initial={userId === initialUser ? week : null} userId={userId} initialIncludeToday={includeToday} /> : null}
       {shown.length ? (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">{t.overview.allDevices}</h2>

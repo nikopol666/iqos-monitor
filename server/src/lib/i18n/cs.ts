@@ -241,6 +241,8 @@ export const cs: Dictionary = {
     perDay: "{n} / den",
     totalWeek: "celkem {n}",
     last7: "Posledních 7 dní",
+    last7ToYesterday: "Posledních 7 celých dní",
+    includeToday: "Včetně dneška",
     avg7: "Průměr za 7 dní: {sticks} náplní denně · {puffs} potáhnutí na náplň",
     puffsPerStick: "Potáhnutí na náplň",
   },

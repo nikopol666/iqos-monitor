@@ -239,6 +239,8 @@ export const en = {
     perDay: "{n} / day",
     totalWeek: "{n} in total",
     last7: "Last 7 days",
+    last7ToYesterday: "Last 7 full days",
+    includeToday: "Include today",
     avg7: "7-day average: {sticks} sticks per day · {puffs} puffs per stick",
     puffsPerStick: "Puffs per stick",
   },
