@@ -82,23 +82,32 @@ export function DeviceSettings({ serial, connected, initial }: { serial: string;
   const findJob = pendingFor("find");
   const restartJob = pendingFor("restart");
 
-  /** Big, self-explaining action tile: icon, title, one line of what happens. */
-  function actionTile(opts: { icon: React.ReactNode; title: string; desc: string; onClick: () => void; busy: boolean; tone: "neutral" | "accent" | "danger"; extra?: React.ReactNode; off?: boolean }) {
+  /** Big, self-explaining action tile: a real button with icon, title and one line of what happens. */
+  function actionTile(opts: { icon: React.ReactNode; title: string; desc: string; onClick: () => void; busy: boolean; tone: "neutral" | "accent" | "danger"; state?: string; extra?: React.ReactNode; off?: boolean }) {
     const tones = {
-      neutral: "border-border bg-surface hover:border-accent",
-      accent: "border-accent/60 bg-accent/10 hover:border-accent",
-      danger: "border-critical/40 bg-critical/5 hover:border-critical",
+      neutral: "border-border bg-surface-2 text-text hover:border-text-2",
+      accent: "border-accent bg-accent text-accent-ink hover:brightness-110",
+      danger: "border-critical/60 bg-critical/10 text-text hover:border-critical",
     } as const;
-    const iconTones = { neutral: "bg-surface-2 text-text", accent: "bg-accent text-accent-ink", danger: "bg-critical/15 text-critical" } as const;
+    const iconTones = { neutral: "bg-surface text-text", accent: "bg-white/20 text-accent-ink", danger: "bg-critical text-white" } as const;
+    const descTones = { neutral: "text-text-2", accent: "text-accent-ink/80", danger: "text-text-2" } as const;
     return (
-      <div className={`flex flex-col rounded-xl border p-3 transition-colors ${tones[opts.tone]} ${opts.off ? "opacity-50" : ""}`}>
-        <button type="button" disabled={opts.off || opts.busy} onClick={opts.onClick} className="flex w-full items-start gap-3 text-left disabled:cursor-not-allowed">
-          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconTones[opts.tone]}`}>
-            {opts.busy ? <Loader2 size={18} className="animate-spin" aria-hidden /> : opts.icon}
+      <div className="flex flex-col gap-1.5">
+        <button
+          type="button"
+          disabled={opts.off || opts.busy}
+          onClick={opts.onClick}
+          className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left shadow-sm transition-all hover:-translate-y-px hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-sm ${tones[opts.tone]}`}
+        >
+          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${iconTones[opts.tone]}`}>
+            {opts.busy ? <Loader2 size={20} className="animate-spin" aria-hidden /> : opts.icon}
           </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold">{opts.title}</span>
-            <span className="block text-xs text-text-2">{opts.desc}</span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2 text-sm font-semibold">
+              {opts.title}
+              {opts.state ? <span className="rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide dark:bg-white/10">{opts.state}</span> : null}
+            </span>
+            <span className={`block text-xs ${descTones[opts.tone]}`}>{opts.desc}</span>
           </span>
         </button>
         {opts.extra}
@@ -150,18 +159,19 @@ export function DeviceSettings({ serial, connected, initial }: { serial: string;
 
         <section className="md:col-span-2">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-2">{t.device.groupActions}</h3>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid items-start gap-3 sm:grid-cols-3">
             {actionTile({
-              icon: locked ? <Lock size={18} aria-hidden /> : <LockOpen size={18} aria-hidden />,
+              icon: locked ? <Lock size={20} aria-hidden /> : <LockOpen size={20} aria-hidden />,
               title: locked ? t.device.unlockAction : t.device.lockAction,
-              desc: `${locked ? t.device.lockedState : t.device.unlockedState} · ${t.device.lockDesc}`,
+              desc: t.device.lockDesc,
+              state: locked ? t.device.lockedState : t.device.unlockedState,
               onClick: () => change("lock", locked ? "off" : "on"),
               busy: !!lockJob,
               tone: locked ? "accent" : "neutral",
               off: disabled,
             })}
             {actionTile({
-              icon: <Vibrate size={18} aria-hidden />,
+              icon: <Vibrate size={20} aria-hidden />,
               title: t.device.find,
               desc: t.device.findDesc,
               onClick: () => change("find", "on"),
@@ -169,14 +179,14 @@ export function DeviceSettings({ serial, connected, initial }: { serial: string;
               tone: "accent",
               off: disabled,
               extra: (
-                <button type="button" disabled={disabled || findJob?.value === "off"} onClick={() => change("find", "off")} className="mt-2 inline-flex items-center gap-1.5 self-start rounded-md border border-border bg-surface px-2.5 py-1 text-xs text-text-2 hover:text-text disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="button" disabled={disabled || findJob?.value === "off"} onClick={() => change("find", "off")} className="inline-flex items-center gap-1.5 self-end rounded-md border border-border bg-surface px-2.5 py-1 text-xs text-text-2 hover:text-text disabled:cursor-not-allowed disabled:opacity-50">
                   {findJob?.value === "off" ? <Loader2 size={12} className="animate-spin" aria-hidden /> : <Square size={12} aria-hidden />}
                   {t.device.findStop}
                 </button>
               ),
             })}
             {actionTile({
-              icon: <RotateCcw size={18} aria-hidden />,
+              icon: <RotateCcw size={20} aria-hidden />,
               title: t.device.restart,
               desc: t.device.restartDesc,
               onClick: () => confirm(t.device.restartConfirm) && change("restart", "now"),

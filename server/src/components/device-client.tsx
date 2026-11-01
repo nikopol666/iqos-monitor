@@ -97,12 +97,12 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
     [t.device.firmware, v.firmware_version ? <span key="f" title={String(v.firmware_raw ?? "")}>{String(v.firmware_version)}</span> : <span key="f" className="font-mono text-xs">{v.firmware_raw ?? "—"}</span>, "verified", t.device.srcApp],
     [t.device.battery, !d.connected ? t.device.offlineValue : d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`, "verified", t.device.srcApp],
     [t.device.chargingLabel, !d.connected ? t.device.offlineValue : d.charging == null ? "—" : d.charging ? t.common.yes : t.common.no, "verified", t.device.srcUser],
-    [t.device.batteryTemp, !d.connected ? t.device.offlineValue : typeof v.battery_temp_c === "number" ? `${v.battery_temp_c} °C` : "—", "candidate", t.device.srcTempCorr],
+    [t.device.batteryTemp, !d.connected ? t.device.offlineValue : typeof v.battery_temp_c === "number" ? `${v.battery_temp_c} °C` : "—", "verified", t.device.srcCharge],
     [t.device.brightnessLevel, !d.connected ? t.device.offlineValue : d.brightness == null ? "—" : d.brightness === 0x64 ? t.overview.brightnessHigh : d.brightness === 0x1e ? t.overview.brightnessLow : String(d.brightness), "verified", t.device.srcCapture],
     [t.device.lifetimeSticks, fmt.integer(d.lifetime.sticks), "verified", t.device.srcSession],
     [t.device.lifetimePuffs, fmt.integer(d.lifetime.puffs), "verified", t.device.srcSession],
     [t.device.avgPuffs, d.lifetime.sticks && d.lifetime.puffs != null ? fmt.number(Math.round((d.lifetime.puffs / d.lifetime.sticks) * 100) / 100) : "—", "verified", t.device.srcDerived],
-    [t.device.lifetimeHours, d.lifetime.seconds == null ? "—" : fmt.number(Math.round((d.lifetime.seconds / 3600) * 10) / 10), "candidate", t.device.srcHoursUnit],
+    [t.device.lifetimeHours, d.lifetime.seconds == null ? "—" : fmt.number(Math.round((d.lifetime.seconds / 3600) * 10) / 10), "verified", t.device.srcHoursUnit],
     [t.device.errorCode, d.connected ? (d.live?.errorState ?? "—") : (v.error_state_code ?? "—"), "candidate", t.device.srcIqosBar],
     [t.device.sensor83, v.sensor_83_raw_value ?? "—", "candidate", t.device.srcVoltCorr],
     [t.device.sensor84, v.sensor_84_raw_value ?? "—", "candidate", t.device.srcTempCorr84],
@@ -152,9 +152,11 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
               <div key={k} className="flex items-center justify-between gap-3 border-b border-border py-1">
                 <dt className="flex items-center gap-2 text-text-2">
                   {k}
-                  <span className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none ${tagClass[tag]}`} title={source}>
-                    {tagLabel[tag]}
-                  </span>
+                  {tag !== "verified" ? (
+                    <span className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none ${tagClass[tag]}`} title={source}>
+                      {tagLabel[tag]}
+                    </span>
+                  ) : null}
                 </dt>
                 <dd className="tabular text-right font-medium">{val}</dd>
               </div>
@@ -227,8 +229,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
                   <th className="py-1.5 pr-3 font-medium">{t.device.colTime}</th>
                   <th className="py-1.5 pr-3 text-right font-medium">{t.device.colPuffs}</th>
                   <th className="py-1.5 pr-3 text-right font-medium">{t.device.colDuration}</th>
-                  <th className="py-1.5 pr-3 font-medium">{t.device.colStatus}</th>
-                  <th className="py-1.5 font-medium">{t.device.colHex}</th>
+                  <th className="py-1.5 font-medium">{t.device.colStatus}</th>
                 </tr>
               </thead>
               <tbody className="tabular">
@@ -241,22 +242,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
                     </td>
                     <td className="py-1.5 pr-3 text-right">{e.puffCount ?? "—"}</td>
                     <td className="py-1.5 pr-3 text-right">{e.lastPuffS == null ? "—" : `${Math.floor(e.lastPuffS / 60)}:${String(e.lastPuffS % 60).padStart(2, "0")}`}</td>
-                    <td className="py-1.5 pr-3 text-xs">{(t.status as Record<string, string>)[e.status] ?? e.status}</td>
-                    <td className="py-1.5">
-                      {e.responseHex ? (
-                        <details>
-                          <summary className="cursor-pointer text-xs text-accent">HEX ({Math.floor(e.responseHex.length / 2)} B)</summary>
-                          <code className="block max-w-xl break-all font-mono text-[11px] text-text-2">{e.responseHex}</code>
-                          {e.puffPairs && e.puffPairs.length ? (
-                            <div className="mt-1 text-[11px] text-muted">
-                              {t.device.puffPairs}: <code className="font-mono">{e.puffPairs.join(" ")}</code>
-                            </div>
-                          ) : null}
-                        </details>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
+                    <td className="py-1.5 text-xs">{(t.status as Record<string, string>)[e.status] ?? e.status}</td>
                   </tr>
                 ))}
               </tbody>

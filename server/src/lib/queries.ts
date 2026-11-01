@@ -120,12 +120,13 @@ export function deviceOverview(device: schema.Device, siblings: schema.Device[] 
 }
 
 /**
- * The device's usage counter ticks about 2.4 times per second of a session
- * (eight sessions with the length from the last-session register: 2.32–2.48),
- * not 4 as iqos-bar assumes. The agent reports ticks / 4; undo that and apply
- * the measured rate. See PROTOCOL.md, "Korelace kandidátů".
+ * The device's usage counter ticks about 2.35 times per second of a session:
+ * per session 2.3–2.5 (last-session register), over a whole archive 2.34
+ * (1 188 records' durations summed against the counter), not 4 as iqos-bar
+ * assumes. The agent reports ticks / 4; undo that and apply the measured
+ * rate. See PROTOCOL.md, "Korelace kandidátů".
  */
-export const USAGE_TICKS_PER_SECOND = 2.4;
+export const USAGE_TICKS_PER_SECOND = 2.35;
 export function usageSeconds(agentSeconds: number | null): number | null {
   return agentSeconds == null ? null : Math.round((agentSeconds * 4) / USAGE_TICKS_PER_SECOND);
 }

@@ -233,6 +233,8 @@ export interface IncomingLive {
   status_60_raw?: string | null;
   battery_temp_c?: number | null;
   charging?: boolean | null;
+  sensor_83?: number | null;
+  sensor_84?: number | null;
 }
 
 /** The part of extra_json whose change is worth a live sample. */
@@ -273,6 +275,8 @@ export function updateLive(serial: string, agentId: number | null, live: Incomin
       lifetime_seconds: live.lifetime_seconds == null ? null : Math.round(live.lifetime_seconds * 4) / 4,
       error_state: live.error_state ?? null,
       session_raw: live.session_raw ?? null,
+      sensor_83: live.sensor_83 ?? null,
+      sensor_84: live.sensor_84 ?? null,
     }),
   };
   if (live.connected === false) {

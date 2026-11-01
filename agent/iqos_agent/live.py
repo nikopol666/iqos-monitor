@@ -6,7 +6,7 @@ import time
 
 from iqos_agent.device_info import READ_COMMANDS, read_classic, u16, u32
 
-LIVE_KEYS = ("battery", "stick_state", "counters", "error_state", "session", "status_60")
+LIVE_KEYS = ("battery", "stick_state", "counters", "error_state", "session", "status_60", "sensor_83", "sensor_84")
 
 
 def read_live(dev) -> dict:
@@ -36,6 +36,9 @@ def read_live(dev) -> dict:
         "lifetime_puffs": u32(counters, 10),
         "lifetime_seconds": (quarter / 4) if quarter is not None else None,
         "session_raw": payloads["session"].hex() if payloads.get("session") else None,
+        # Candidate voltage / temperature sensors (regs 0x83 / 0x84), logged for correlation with reg 0x60
+        "sensor_83": u16(payloads.get("sensor_83", b""), 0),
+        "sensor_84": u16(payloads.get("sensor_84", b""), 0),
         "statuses": statuses,
         "read_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
     }
