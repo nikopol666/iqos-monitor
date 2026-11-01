@@ -3,10 +3,8 @@ name: agent
 on:
   push:
     branches: [main]
-    paths: ["agent/**", "test-vectors/**", ".github/workflows/agent.yml"]
     tags: ["v*"]
   pull_request:
-    paths: ["agent/**", "test-vectors/**"]
   workflow_dispatch:
 
 permissions:
