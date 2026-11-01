@@ -138,4 +138,14 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE live_state ADD COLUMN extra_json TEXT;
   ALTER TABLE live_samples ADD COLUMN extra_json TEXT;
   `,
+  // v6 – records removed by the user: 'deleted' comes back with a full history download, 'blocked' never
+  `
+  CREATE TABLE IF NOT EXISTS event_blocks (
+    serial TEXT NOT NULL,
+    event_id INTEGER NOT NULL,
+    mode TEXT NOT NULL,
+    created_utc TEXT NOT NULL,
+    PRIMARY KEY (serial, event_id)
+  );
+  `,
 ];

@@ -9,6 +9,7 @@ import { Badge, Card, CardTitle, Notice } from "@/components/ui";
 import { DeviceImage } from "@/components/device-image";
 import { EtaTracker, formatEta } from "@/lib/eta";
 import { DeviceSettings } from "@/components/device-settings";
+import { FaultyRecords, type BlockRow, type FaultyRecord } from "@/components/faulty-records";
 import type { SettingsView } from "@/app/api/devices/[serial]/settings/route";
 
 interface SnapshotView {
@@ -17,7 +18,7 @@ interface SnapshotView {
   statuses: Record<string, string>;
 }
 
-export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, settings }: { initial: DeviceOverview; snapshot: SnapshotView | null; firstPage: EventPage; totalAll: number; samples: LiveSample[]; settings: SettingsView }) {
+export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, settings, faulty, blocks }: { initial: DeviceOverview; snapshot: SnapshotView | null; firstPage: EventPage; totalAll: number; samples: LiveSample[]; settings: SettingsView; faulty: FaultyRecord[]; blocks: BlockRow[] }) {
   const { t, f } = useI18n();
   const fmt = useFormat();
   const [d, setD] = useState(initial);
@@ -269,6 +270,8 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
         ) : null}
         </div>
       </details>
+
+      <FaultyRecords serial={d.serial} faulty={faulty} blocks={blocks} />
 
       {samples.length ? (
         <details className="ui-card group p-4 sm:p-5">

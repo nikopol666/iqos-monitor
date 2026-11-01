@@ -299,6 +299,14 @@ export function recordsInRange(serials: string[], from: string, to: string, excl
   }));
 }
 
+/** Records worth a second look: invalid status or a suspicious clock. */
+export function faultyRecords(serial: string, limit = 200): { eventId: number; timestampUtc: string | null; status: string; puffCount: number | null; clockSuspect: boolean }[] {
+  const rows = getSqlite()
+    .prepare("SELECT event_id, timestamp_utc, status, puff_count, clock_suspect FROM events WHERE serial = ? AND (status != 'ok' OR clock_suspect = 1) ORDER BY event_id DESC LIMIT ?")
+    .all(serial, limit) as { event_id: number; timestamp_utc: string | null; status: string; puff_count: number | null; clock_suspect: number }[];
+  return rows.map((r) => ({ eventId: r.event_id, timestampUtc: r.timestamp_utc, status: r.status, puffCount: r.puff_count, clockSuspect: !!r.clock_suspect }));
+}
+
 export interface EventPage {
   items: {
     eventId: number;

@@ -121,6 +121,30 @@ describe("ingestEvents", () => {
     expect(JSON.parse(last.extra_json).lifetime_seconds).toBe(102);
   });
 
+  it("deleted ids come back only with a full history download, blocked ones never", () => {
+    const s = "BLOCK000000001";
+    ingest.ensureDevice(s);
+    ingest.ingestEvents(s, [
+      { event_id: 5, status: "ok", response_hex: "" },
+      { event_id: 6, status: "ok", response_hex: "" },
+      { event_id: 7, status: "ok", response_hex: "" },
+    ]);
+    ingest.removeRecord(s, 5, "deleted");
+    ingest.removeRecord(s, 6, "blocked");
+    expect(ingest.missingIds(s, 5, 7)).toEqual([]);
+    expect(ingest.missingIds(s, 5, 7, true)).toEqual([5]);
+    // a blocked id is acknowledged but not stored; a deleted id is stored again and unblocked
+    const r = ingest.ingestEvents(s, [
+      { event_id: 5, status: "ok", response_hex: "" },
+      { event_id: 6, status: "ok", response_hex: "" },
+    ]);
+    expect(r.acked).toEqual([5, 6]);
+    expect(ingest.listBlocks(s).map((b) => b.eventId)).toEqual([6]);
+    expect(ingest.missingIds(s, 5, 7, true)).toEqual([]);
+    ingest.restoreRecord(s, 6);
+    expect(ingest.missingIds(s, 5, 7)).toEqual([6]);
+  });
+
   it("lists the archive ids the server still lacks", () => {
     const all = ingest.missingIds("UNKNOWN0000000", 0, 4);
     expect(all).toEqual([0, 1, 2, 3, 4]);

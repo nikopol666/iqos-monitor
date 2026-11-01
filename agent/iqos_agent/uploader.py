@@ -58,9 +58,13 @@ class ServerClient:
     def heartbeat(self, devices: list[dict]) -> dict:
         return self._post("/api/agent/heartbeat", {"devices": devices})
 
-    def get_sync(self, serial: str, low: int, high: int) -> dict:
-        """Which archive IDs in [low, high] the server still lacks, plus its range state."""
-        return self._request("GET", f"/api/agent/devices/{serial}/sync", params={"low": low, "high": high})
+    def get_sync(self, serial: str, low: int, high: int, full: bool = False) -> dict:
+        """Which archive IDs in [low, high] the server still lacks, plus its range state.
+        full=True (full history download) also lists ids the user deleted, never blocked ones."""
+        params = {"low": low, "high": high}
+        if full:
+            params["full"] = 1
+        return self._request("GET", f"/api/agent/devices/{serial}/sync", params=params)
 
     def post_events(self, serial: str, events: list[dict], next_index: Optional[int] = None,
                     range_complete: bool = False) -> dict:

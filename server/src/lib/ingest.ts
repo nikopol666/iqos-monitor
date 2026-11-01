@@ -60,6 +60,8 @@ export function ingestEvents(serial: string, items: IncomingEvent[]): IngestResu
   const sqlite = getSqlite();
   const now = nowUtc();
   const select = sqlite.prepare("SELECT status FROM events WHERE serial = ? AND event_id = ?");
+  const blockOf = sqlite.prepare("SELECT mode FROM event_blocks WHERE serial = ? AND event_id = ?");
+  const unblock = sqlite.prepare("DELETE FROM event_blocks WHERE serial = ? AND event_id = ?");
   const insert = sqlite.prepare(`
     INSERT INTO events (serial, event_id, timestamp_utc, status, response_hex, raw_packets_json,
                         puff_count, puff_pairs_json, record_marker, clock_suspect, fetched_at_utc, received_at_utc)
@@ -88,6 +90,14 @@ export function ingestEvents(serial: string, items: IncomingEvent[]): IngestResu
         result.acked.push(eventId);
         continue;
       }
+      const block = blockOf.get(serial, eventId) as { mode: string } | undefined;
+      if (block?.mode === "blocked") {
+        // Never stored again; acknowledged so the agent does not retry.
+        result.skipped++;
+        result.acked.push(eventId);
+        continue;
+      }
+      if (block) unblock.run(serial, eventId); // a deleted record is back (full history download)
       const decoded = decodeEvent(String(item.status ?? "unknown"), item.response_hex ?? "");
       insert.run({
         serial,
@@ -371,14 +381,40 @@ export function updateJob(id: number, patch: JobUpdate): schema.AgentJob | undef
  * Archive IDs in [low, high] the server does not hold as 'ok' or 'empty'. The
  * agent keeps no database: this is how it learns what to read from the device.
  */
-export function missingIds(serial: string, low: number, high: number): number[] {
-  const rows = getSqlite()
+export function missingIds(serial: string, low: number, high: number, fullHistory = false): number[] {
+  const sqlite = getSqlite();
+  const rows = sqlite
     .prepare("SELECT event_id FROM events WHERE serial = ? AND status IN ('ok','empty') AND event_id BETWEEN ? AND ?")
     .all(serial, low, high) as { event_id: number }[];
   const stored = new Set(rows.map((r) => r.event_id));
+  // User-removed ids: 'blocked' never again, 'deleted' only via a full history download.
+  const blocked = sqlite
+    .prepare(`SELECT event_id FROM event_blocks WHERE serial = ? AND event_id BETWEEN ? AND ? ${fullHistory ? "AND mode = 'blocked'" : ""}`)
+    .all(serial, low, high) as { event_id: number }[];
+  for (const b of blocked) stored.add(b.event_id);
   const out: number[] = [];
   for (let i = low; i <= high; i++) if (!stored.has(i)) out.push(i);
   return out;
+}
+
+/** Remove a record; 'deleted' may come back with a full history download, 'blocked' never. */
+export function removeRecord(serial: string, eventId: number, mode: "deleted" | "blocked"): void {
+  const sqlite = getSqlite();
+  sqlite.transaction(() => {
+    sqlite.prepare("DELETE FROM events WHERE serial = ? AND event_id = ?").run(serial, eventId);
+    sqlite.prepare("INSERT OR REPLACE INTO event_blocks (serial, event_id, mode, created_utc) VALUES (?, ?, ?, ?)").run(serial, eventId, mode, nowUtc());
+  })();
+  recomputeClockSuspect(serial);
+  refreshDeviceRange(serial);
+}
+
+/** Forget a removal: the agent reads the id again on its next sync. */
+export function restoreRecord(serial: string, eventId: number): void {
+  getSqlite().prepare("DELETE FROM event_blocks WHERE serial = ? AND event_id = ?").run(serial, eventId);
+}
+
+export function listBlocks(serial: string): schema.EventBlock[] {
+  return getDb().select().from(schema.eventBlocks).where(eq(schema.eventBlocks.serial, serial)).orderBy(desc(schema.eventBlocks.eventId)).all();
 }
 
 /** The queued or running full-history job of a device, if any. */

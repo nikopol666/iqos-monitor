@@ -93,6 +93,19 @@ export const liveSamples = sqliteTable(
   (t) => [index("live_samples_time").on(t.serial, t.atUtc)],
 );
 
+/** Archive IDs the user removed; 'deleted' may return with a full history download, 'blocked' is never read again. */
+export const eventBlocks = sqliteTable(
+  "event_blocks",
+  {
+    serial: text("serial").notNull(),
+    eventId: integer("event_id").notNull(),
+    mode: text("mode").notNull(),
+    createdUtc: text("created_utc").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.serial, t.eventId] })],
+);
+export type EventBlock = typeof eventBlocks.$inferSelect;
+
 export const observations = sqliteTable(
   "observations",
   {

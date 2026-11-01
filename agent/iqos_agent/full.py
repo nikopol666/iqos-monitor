@@ -36,7 +36,7 @@ def sync_full(archive, info, desired=None, delay=0.10, device_factory=IQOSDevice
         if not 1 <= next_index <= 0x1000000:
             raise RuntimeError('Metadata returned invalid next history index')
         start = next_index - 1
-        state = archive.sync_state(0, start)
+        state = archive.sync_state(0, start, full=True)
         acked = state.get('acked_next_index')
         if state.get('full_history_complete') and acked is not None and next_index < acked:
             raise RuntimeError(

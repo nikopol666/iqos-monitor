@@ -21,7 +21,7 @@ class FakeServer:
         row = self.events.get(serial, {}).get(event_id)
         return row[0] if row else None
 
-    def get_sync(self, serial, low, high):
+    def get_sync(self, serial, low, high, full=False):
         self._check()
         stored = {i for i, (st, _) in self.events.get(serial, {}).items() if st in GOOD}
         return {

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { deviceOverview, eventPage, getDevice, latestSnapshot, recentLiveSamples } from "@/lib/queries";
+import { deviceOverview, eventPage, faultyRecords, getDevice, latestSnapshot, recentLiveSamples } from "@/lib/queries";
+import { listBlocks } from "@/lib/ingest";
 import { DeviceClient } from "@/components/device-client";
 import { settingsView } from "@/app/api/devices/[serial]/settings/route";
 
@@ -24,6 +25,8 @@ export default async function DevicePage({ params }: PageProps<"/devices/[serial
       totalAll={eventPage(serial, 0, 1).total}
       samples={recentLiveSamples(serial, 40)}
       settings={settingsView(serial)}
+      faulty={faultyRecords(serial)}
+      blocks={listBlocks(serial).map((b) => ({ eventId: b.eventId, mode: b.mode as "deleted" | "blocked", createdUtc: b.createdUtc }))}
     />
   );
 }

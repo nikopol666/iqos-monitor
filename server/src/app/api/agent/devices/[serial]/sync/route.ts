@@ -11,7 +11,8 @@ const MAX_RANGE = 2_000_000;
 /**
  * Sync state for an agent: which archive IDs in [low, high] the server still
  * lacks, plus the range it has acknowledged. The agent holds no database, so
- * this answer decides what it reads from the device.
+ * this answer decides what it reads from the device. `full=1` (full history
+ * download) also re-reads ids the user deleted, never the blocked ones.
  */
 export async function GET(request: Request, ctx: RouteContext<"/api/agent/devices/[serial]/sync">) {
   const identity = authenticateAgent(request);
@@ -19,6 +20,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/agent/device
   const { serial } = await ctx.params;
   if (!validSerial(serial)) return badRequest("invalid serial");
   const url = new URL(request.url);
+  const fullHistory = url.searchParams.get("full") === "1";
   const low = Number(url.searchParams.get("low") ?? 0);
   const high = Number(url.searchParams.get("high"));
   if (!Number.isInteger(low) || !Number.isInteger(high) || low < 0 || high < low || high > 0xffffff) return badRequest("low/high required");
@@ -30,6 +32,6 @@ export async function GET(request: Request, ctx: RouteContext<"/api/agent/device
     acked_next_index: device?.ackedNextIndex ?? null,
     lowest_stored_index: device?.lowestStoredIndex ?? null,
     full_history_complete: !!device?.fullHistoryComplete,
-    missing: missingIds(serial, low, high),
+    missing: missingIds(serial, low, high, fullHistory),
   });
 }

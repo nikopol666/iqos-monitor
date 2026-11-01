@@ -494,7 +494,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                     <Card>
                       <CardTitle right={<span className="text-xs text-muted">{t.stats.sticksPerDayShort}</span>}>{t.stats.byHour}</CardTitle>
                       <DistributionChart
-                        rows={data.byHour.map((n, h) => ({ label: String(h).padStart(2, "0"), full: `${String(h).padStart(2, "0")}:00–${String(h).padStart(2, "0")}:59`, value: Math.round((n / Math.max(1, data.totals.daysInRange)) * 100) / 100, count: n }))}
+                        rows={data.byHour.map((n, h) => ({ label: String(h).padStart(2, "0"), full: `${String(h).padStart(2, "0")}:00–${String(h).padStart(2, "0")}:59`, value: n, hint: f(t.stats.perDayHint, { n: fmt.number(Math.round((n / Math.max(1, data.totals.daysInRange)) * 100) / 100) }) }))}
                         tickEvery={3}
                         countLabel={t.stats.sticks}
                       />
@@ -502,7 +502,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                     <Card>
                       <CardTitle right={<span className="text-xs text-muted">{t.stats.sticksPerDayShort}</span>}>{t.stats.byWeekday}</CardTitle>
                       <DistributionChart
-                        rows={Array.from({ length: 7 }, (_, i) => (i + weekStart - 1) % 7).map((i) => ({ label: weekdayNames[i], full: weekdayNames[i], value: Math.round((data.byWeekday[i] / Math.max(1, data.totals.daysInRange / 7)) * 100) / 100, count: data.byWeekday[i] }))}
+                        rows={Array.from({ length: 7 }, (_, i) => (i + weekStart - 1) % 7).map((i) => ({ label: weekdayNames[i], full: weekdayNames[i], value: data.byWeekday[i], hint: f(t.stats.perWeekdayHint, { n: fmt.number(Math.round((data.byWeekday[i] / Math.max(1, data.totals.daysInRange / 7)) * 100) / 100) }) }))}
                         tickEvery={1}
                         countLabel={t.stats.sticks}
                       />
@@ -575,12 +575,12 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                       <thead className="text-left text-xs text-text-2">
                         <tr>
                           <th className="py-1.5 pr-3 font-medium">{t.stats.period}</th>
-                          <th className="py-1.5 pr-3 text-right font-medium">{t.stats.records}</th>
-                          <th className="py-1.5 pr-3 text-right font-medium">{t.stats.sessions}</th>
+                          <th className="py-1.5 pr-3 text-right font-medium">{t.stats.sticks}</th>
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.puffs}</th>
-                          {dataGroup !== "hour" ? <th className="py-1.5 pr-3 text-right font-medium">{t.stats.avgSticksPerDay}</th> : null}
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.avgPuffsPerStick}</th>
-                          <th className="py-1.5 text-right font-medium">{t.stats.stickDurationShort}</th>
+                          <th className="py-1.5 pr-3 text-right font-medium">{t.stats.stickDurationShort}</th>
+                          {dataGroup !== "hour" ? <th className="py-1.5 pr-3 text-right font-medium">{t.stats.avgSticksPerDay}</th> : null}
+                          <th className="py-1.5 text-right font-medium text-muted">{t.stats.records}</th>
                         </tr>
                       </thead>
                       <tbody className="tabular">
@@ -592,12 +592,12 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                                 {bucketLabel(b, dataGroup)}
                                 {b.suspect ? <span title={t.device.clockSuspect}> ⚠</span> : null}
                               </td>
-                              <td className="py-1.5 pr-3 text-right">{fmt.integer(b.records)}</td>
-                              <td className="py-1.5 pr-3 text-right">{fmt.integer(b.sessions)}</td>
+                              <td className="py-1.5 pr-3 text-right font-medium">{fmt.integer(b.sessions)}</td>
                               <td className="py-1.5 pr-3 text-right">{fmt.integer(b.puffs)}</td>
-                              {dataGroup !== "hour" ? <td className="py-1.5 pr-3 text-right">{fmt.number(Math.round((b.sessions / b.days) * 100) / 100)}</td> : null}
                               <td className="py-1.5 pr-3 text-right">{b.sessions ? fmt.number(Math.round((b.puffs / b.sessions) * 10) / 10) : "—"}</td>
-                              <td className="py-1.5 text-right">{b.avgLastPuffS == null ? "—" : `${fmt.number(Math.round(b.avgLastPuffS / 6) / 10)} min`}</td>
+                              <td className="py-1.5 pr-3 text-right">{b.avgLastPuffS == null ? "—" : `${fmt.number(Math.round(b.avgLastPuffS / 6) / 10)} min`}</td>
+                              {dataGroup !== "hour" ? <td className="py-1.5 pr-3 text-right">{fmt.number(Math.round((b.sessions / b.days) * 100) / 100)}</td> : null}
+                              <td className="py-1.5 text-right text-muted">{fmt.integer(b.records)}</td>
                             </tr>
                           ))}
                       </tbody>
@@ -629,6 +629,19 @@ function Kpi({ label, value, delta, hint, className = "" }: { label: string; val
 }
 
 type ChartRow = Record<string, number | string | null>;
+
+/** A value on top of every column that is wide enough to carry it (never on zero). */
+function columnLabel(props: unknown, format: (n: number) => string): React.ReactElement | null {
+  const { x, y, width, value } = props as { x?: number; y?: number; width?: number; value?: number | string };
+  if (x == null || y == null || width == null || !value) return null;
+  const text = format(Number(value));
+  if (width < Math.max(14, text.length * 7)) return null;
+  return (
+    <text x={x + width / 2} y={y - 5} textAnchor="middle" fontSize={11} fontWeight={600} fill="var(--text)">
+      {text}
+    </text>
+  );
+}
 interface SeriesDef {
   key: string;
   name: string;
@@ -647,7 +660,6 @@ const SticksChart = memo(function SticksChart({ rows, bars, average, averageLabe
   const fmt = useFormat();
   const ref = useRef<HTMLDivElement>(null);
   const interval = useTickInterval(ref, rows.length, tickEvery);
-  const peak = rows.reduce((best, r, i) => (Number(r.sessions) > Number(rows[best]?.sessions ?? -1) ? i : best), 0);
   const last = bars[bars.length - 1];
   return (
     <div ref={ref} className="h-56 w-full sm:h-72">
@@ -675,21 +687,7 @@ const SticksChart = memo(function SticksChart({ rows, bars, average, averageLabe
           />
           {bars.map((s, i) => (
             <Bar key={s.key} dataKey={s.key} name={s.name} stackId="a" fill={s.color} stroke="var(--surface)" strokeWidth={2} maxBarSize={24} radius={i === bars.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false}>
-              {s.key === last?.key ? (
-                <LabelList
-                  dataKey="sessions"
-                  position="top"
-                  content={(props) => {
-                    const { x, y, width, index, value } = props as { x?: number; y?: number; width?: number; index?: number; value?: number | string };
-                    if (index !== peak || x == null || y == null || width == null || !value) return null;
-                    return (
-                      <text x={x + width / 2} y={y - 6} textAnchor="middle" fontSize={11} fontWeight={600} fill="var(--text)">
-                        {fmt.integer(Number(value))}
-                      </text>
-                    );
-                  }}
-                />
-              ) : null}
+              {s.key === last?.key ? <LabelList dataKey="sessions" position="top" content={(props) => columnLabel(props, fmt.integer)} /> : null}
             </Bar>
           ))}
           {average > 0 ? <ReferenceLine y={average} stroke="var(--text-2)" strokeWidth={1} ifOverflow="extendDomain" label={{ value: `${averageLabel} ${fmt.number(average)}`, position: "right", fill: "var(--text-2)", fontSize: 11 }} /> : null}
@@ -750,9 +748,8 @@ const PuffsPerStickChart = memo(function PuffsPerStickChart({ rows, lines, avera
 });
 
 /** Single-hue columns for a distribution (hour of day, weekday). */
-const DistributionChart = memo(function DistributionChart({ rows, tickEvery, countLabel }: { rows: { label: string; full: string; value: number; count: number }[]; tickEvery: number; countLabel: string }) {
+const DistributionChart = memo(function DistributionChart({ rows, tickEvery, countLabel }: { rows: { label: string; full: string; value: number; hint: string }[]; tickEvery: number; countLabel: string }) {
   const fmt = useFormat();
-  const peak = rows.reduce((best, r, i) => (r.value > (rows[best]?.value ?? -1) ? i : best), 0);
   return (
     <div className="h-44 w-full sm:h-52">
       <ResponsiveContainer>
@@ -766,22 +763,10 @@ const DistributionChart = memo(function DistributionChart({ rows, tickEvery, cou
             labelStyle={{ color: "var(--text-2)" }}
             itemStyle={{ color: "var(--text)" }}
             labelFormatter={(_label, payload) => String(payload?.[0]?.payload?.full ?? _label)}
-            formatter={(value, _name, item) => [`${fmt.number(Number(value))} · ${fmt.integer(Number((item as { payload?: { count?: number } }).payload?.count ?? 0))} ${countLabel.toLowerCase()}`, ""]}
+            formatter={(value, _name, item) => [`${fmt.integer(Number(value))} ${countLabel.toLowerCase()} · ${(item as { payload?: { hint?: string } }).payload?.hint ?? ""}`, ""]}
           />
           <Bar dataKey="value" fill="var(--accent)" stroke="var(--surface)" strokeWidth={2} maxBarSize={24} radius={[4, 4, 0, 0]} isAnimationActive={false}>
-            <LabelList
-              dataKey="value"
-              position="top"
-              content={(props) => {
-                const { x, y, width, index, value } = props as { x?: number; y?: number; width?: number; index?: number; value?: number | string };
-                if (index !== peak || x == null || y == null || width == null || !value) return null;
-                return (
-                  <text x={x + width / 2} y={y - 6} textAnchor="middle" fontSize={11} fontWeight={600} fill="var(--text)">
-                    {fmt.number(Number(value))}
-                  </text>
-                );
-              }}
-            />
+            <LabelList dataKey="value" position="top" content={(props) => columnLabel(props, fmt.integer)} />
           </Bar>
         </ComposedChart>
       </ResponsiveContainer>

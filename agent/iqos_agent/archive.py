@@ -27,10 +27,12 @@ class ServerArchive:
         self._pending: list[dict] = []
 
     # -- state from the server ----------------------------------------------------------
-    def sync_state(self, low: int, high: int) -> dict:
+    def sync_state(self, low: int, high: int, full: bool = False) -> dict:
         """acked_next_index, lowest_stored_index, full_history_complete and the list of
-        archive IDs in [low, high] the server does not hold as 'ok' or 'empty'."""
-        state = self.client.get_sync(self.serial, low, high)
+        archive IDs in [low, high] the server does not hold as 'ok' or 'empty'.
+        full=True is the web's full history download: it also re-reads ids the user
+        deleted (never the blocked ones)."""
+        state = self.client.get_sync(self.serial, low, high, full)
         state["missing"] = [int(i) for i in state.get("missing") or []]
         return state
 
