@@ -1,7 +1,7 @@
 """Device settings writes – ONLY frames captured from the official IQOS app.
 
 Every write below was observed on an ILUMA i ONE (model code 42PT) over USB
-in `modra nastaveni.pcapng` / `modra_nastaveni_2.pcapng` (2026-10-28): the app
+in USB captures of the official desktop app (2026-10-28): the app
 sent the frame, the device acknowledged it and a subsequent read returned the
 new value. Frames are replayed byte-for-byte; nothing is composed at runtime.
 Writes are refused for any other model code.

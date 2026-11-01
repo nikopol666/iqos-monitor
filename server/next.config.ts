@@ -7,11 +7,11 @@ const nextConfig: NextConfig = {
   // so the Cache Components model brings nothing here and would force Suspense
   // boundaries around every database read.
   cacheComponents: false,
-  // Dev server only: phones and other LAN clients load the page by this
-  // machine's IP, and Next.js 16 refuses to serve /_next/* to origins it does
-  // not know (403 → no JavaScript at all on the phone). Production (Docker)
-  // is unaffected. Extend via DEV_ORIGINS="ip1,ip2" if the address changes.
-  allowedDevOrigins: ["192.168.1.10", "localhost", "127.0.0.1", ...(process.env.DEV_ORIGINS ? process.env.DEV_ORIGINS.split(",") : [])],
+  // Dev server only: a phone on the LAN loads the page by this machine's IP,
+  // and Next.js refuses to serve /_next/* to origins it does not know (403,
+  // no JavaScript at all). List your LAN address in DEV_ORIGINS="ip1,ip2"
+  // (server/.env.local works). Production (Docker) is unaffected.
+  allowedDevOrigins: ["localhost", "127.0.0.1", ...(process.env.DEV_ORIGINS ? process.env.DEV_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean) : [])],
   serverExternalPackages: ["better-sqlite3"],
   turbopack: {
     rules: {

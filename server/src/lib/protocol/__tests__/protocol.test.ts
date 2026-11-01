@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { crc16, crc8 } from "../crc";
 import { hexToBytes } from "../bytes";
@@ -7,6 +7,8 @@ import { checkCrc, decodePuffs, extractDatetime, metadataNextIndex, decodeEvent,
 import { parseSnapshotFrames, READ_COMMANDS, decodeClassic } from "../classic";
 
 const VECTORS = path.resolve(__dirname, "../../../../../test-vectors");
+// Real device captures are not part of the repository (they identify the devices); tests that need them skip.
+const HAVE_VECTORS = existsSync(VECTORS);
 const NOW = new Date("2026-10-28T00:00:00Z");
 
 interface CaptureRecord {
@@ -20,11 +22,11 @@ function loadCapture(name: string): CaptureRecord[] {
   return JSON.parse(readFileSync(path.join(VECTORS, name), "utf8")).results;
 }
 
-describe("history frames (same assertions as agent/tests)", () => {
+describe.skipIf(!HAVE_VECTORS)("history frames (same assertions as agent/tests)", () => {
   it("validates CRC-16 and timestamps of the two controlled sessions", () => {
     const cases: [string, number, string][] = [
-      ["fialova_post_use_20261026_201913.json", 1076, "2026-10-26T19:02:00+00:00"],
-      ["modra_correct_20261026_203051.json", 10487, "2026-10-26T19:07:01+00:00"],
+      ["device-a_post_use_20261026_201913.json", 1076, "2026-10-26T19:02:00+00:00"],
+      ["device-b_correct_20261026_203051.json", 10487, "2026-10-26T19:07:01+00:00"],
     ];
     for (const [file, id, time] of cases) {
       const rec = loadCapture(file).find((r) => r.id === id)!;
@@ -50,11 +52,11 @@ describe("history frames (same assertions as agent/tests)", () => {
 
   it("decodes puff counts on all 26 real frames, incl. controlled 18/14", () => {
     const files = [
-      "fialova_history_20261026_192057.json",
-      "fialova_history_older_20261026_195416.json",
-      "fialova_history_sample_20261026_195811.json",
-      "fialova_post_use_20261026_201913.json",
-      "modra_correct_20261026_203051.json",
+      "device-a_history_20261026_192057.json",
+      "device-a_history_older_20261026_195416.json",
+      "device-a_history_sample_20261026_195811.json",
+      "device-a_post_use_20261026_201913.json",
+      "device-b_correct_20261026_203051.json",
     ];
     const counts = new Map<number, number>();
     let total = 0;
@@ -81,9 +83,9 @@ describe("history frames (same assertions as agent/tests)", () => {
   });
 
   it("normalises statuses like the Python importer", () => {
-    const empty = loadCapture("modra_post_use_20261026_202103.json")[0];
+    const empty = loadCapture("device-b_post_use_20261026_202103.json")[0];
     expect(decodeEvent("ok", empty.response_hex, NOW).status).toBe("empty");
-    const full = loadCapture("fialova_post_use_20261026_201913.json").find((r) => r.id === 1076)!;
+    const full = loadCapture("device-a_post_use_20261026_201913.json").find((r) => r.id === 1076)!;
     const d = decodeEvent("ok", full.response_hex, NOW);
     expect(d.status).toBe("ok");
     expect(d.puffCount).toBe(18);
@@ -95,7 +97,7 @@ describe("history frames (same assertions as agent/tests)", () => {
 
   it("crc8 rejects a corrupted classic reply", () => {
     // Captured battery reply (fialova): status ok, payload 64 00 ... (100 %).
-    const lines = readFileSync(path.join(VECTORS, "fialova_20261026_201331.jsonl"), "utf8")
+    const lines = readFileSync(path.join(VECTORS, "device-a_20261026_201331.jsonl"), "utf8")
       .split("\n")
       .filter(Boolean)
       .map((l) => JSON.parse(l));
@@ -110,7 +112,7 @@ describe("history frames (same assertions as agent/tests)", () => {
   });
 });
 
-describe("classic diagnostics (test_diagnostics.py port)", () => {
+describe.skipIf(!HAVE_VECTORS)("classic diagnostics (test_diagnostics.py port)", () => {
   const aliases: Record<string, string> = {
     life_data_raw: "sensor_84",
     reg_83_raw: "sensor_83",
@@ -118,8 +120,8 @@ describe("classic diagnostics (test_diagnostics.py port)", () => {
     session_raw: "session",
   };
   const cases: [string, string, number, number][] = [
-    ["fialova", "201331", 1077, 14736],
-    ["modra", "201341", 15204, 201053],
+    ["device-a", "201331", 1077, 14736],
+    ["device-b", "201341", 15204, 201053],
   ];
   for (const [color, stamp, sticks, puffs] of cases) {
     it(`parses the ${color} capture`, () => {
@@ -141,7 +143,7 @@ describe("classic diagnostics (test_diagnostics.py port)", () => {
       expect(snap.values.lifetime_sticks_candidate).toBe(sticks);
       expect(snap.values.lifetime_puffs_candidate).toBe(puffs);
       expect(snap.values.model).toBe("42PT");
-      expect(snap.values.serial_readback).toBe(color === "fialova" ? "DEVICEA0000001" : "DEVICEB0000002");
+      expect(String(snap.values.serial_readback)).toMatch(/^[A-Z0-9]{14}$/);
       expect(snap.statuses.brightness).toBe("unsupported");
       expect(snap.statuses.vibration).toBe("unsupported");
       expect(snap.statuses.flexbattery).toBe("unsupported");

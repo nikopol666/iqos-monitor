@@ -92,12 +92,11 @@ volumes:
   iqos-data:
 ```
 
-Paste it into Portainer or save it as `docker-compose.yml` and run
-`docker compose up -d`. Open `http://<host>:3000`. The database lives in the
-`iqos-data` volume (`/data/iqos.sqlite3`); a bind mount such as
-`/srv/iqos/data:/data` works too, the container fixes the directory
-permissions itself at start. The full file with every option is
-[docker-compose.yml](docker-compose.yml).
+Save it as `docker-compose.yml`, run `docker compose up -d` and open
+`http://<host>:3000`. The database lives in the `iqos-data` volume
+(`/data/iqos.sqlite3`); a bind mount such as `/srv/iqos/data:/data` works
+too, the container sets the directory permissions itself at start. The full
+file with every option is [docker-compose.yml](docker-compose.yml).
 
 Environment variables (see `docker-compose.yml`):
 
@@ -168,14 +167,12 @@ py -3 -m iqos_agent --console
 .\build_agent.ps1   # dist\IQOS-Agent.exe
 ```
 
-`test-vectors/` holds real frames captured from the two test devices; both
-the TypeScript and the Python decoders are tested against them. GitHub
-Actions builds the server image into GHCR on every push to `main` and
-attaches `IQOS-Agent.exe` to tagged releases (`v*`).
-
-Research tools for new captures live in `agent/tools/` (`pcap_scp.py`
-extracts SCP frames from a USBPcap file, `eventlog.py` dumps the device's
-event log read-only).
+The decoder tests run against real frames captured from the authors' devices.
+Those captures identify the devices, so they are not part of the repository;
+the tests that need them skip when `test-vectors/` is absent. For the dev
+server on a phone, list your LAN address in `server/.env.local` as
+`DEV_ORIGINS=192.168.1.10`. GitHub Actions builds the server image into GHCR
+on every push to `main` and attaches `IQOS-Agent.exe` to tagged releases (`v*`).
 
 ## Credits
 

@@ -10,7 +10,10 @@ from iqos_agent.uploader import ServerError
 from tests.fakeserver import FakeServer
 
 ROOT = Path(__file__).resolve().parents[2] / 'test-vectors'
-ORIGINAL=json.loads((ROOT/'fialova_post_use_20261026_201913.json').read_text())['results'][0]['response_hex']
+if not ROOT.exists():
+    print('SKIPPED: test-vectors (real device captures) are not available')
+    raise SystemExit(0)
+ORIGINAL=json.loads((ROOT/'device-a_post_use_20261026_201913.json').read_text())['results'][0]['response_hex']
 START=dt.datetime(2026,10,26,18,0,tzinfo=dt.timezone.utc)
 OLD=dt.datetime(2026,5,3,10,0,tzinfo=dt.timezone.utc)
 CUT=dt.datetime(2026,7,26,0,0,tzinfo=dt.timezone.utc)

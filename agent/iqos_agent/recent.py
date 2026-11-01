@@ -46,7 +46,7 @@ def sync_recent(archive, info, desired=None, delay=0.10, months=3,
     dev: already opened device to reuse (agent); it is not closed here then.
     Raises ServerError when the server stops answering; nothing is kept locally."""
     serial=info['serial_number']
-    print('\n=== '+device_name(serial)+' | posledni '+str(months)+' mesice ===',flush=True)
+    print(f'\n=== {device_name(serial)} | last {months} months ===',flush=True)
     own_device = dev is None
     if own_device:
         dev=device_factory(info)
@@ -56,26 +56,26 @@ def sync_recent(archive, info, desired=None, delay=0.10, months=3,
     try:
         next_idx=dev.next_index()
         if not 1 <= next_idx <= 0x1000000:
-            raise RuntimeError('Chybna metadata historie')
+            raise RuntimeError('Invalid history metadata')
         start=next_idx-1
         state=archive.sync_state(0,start)
         acked=state.get('acked_next_index')
         lowest=state.get('lowest_stored_index')
         if acked is not None and next_idx<acked:
-            raise RuntimeError('Index historie klesl: archiv mohl byt resetovan. Neodvozujeme identitu z ID.')
+            raise RuntimeError('History index went down: the archive may have been reset; stopping so ids are not mixed up.')
         missing=set(state['missing'])
         # A window scan counts as done only once the server recorded its range;
         # until then every connect continues the bounded scan (skipping stored IDs).
         first = acked is None or lowest is None
         cutoff=cutoff_override if cutoff_override is not None else recent_cutoff(months)
-        print('Casovy filtr od '+cutoff.isoformat()+' UTC. Server drzi vsechny ulozene zaznamy.',flush=True)
+        print('Time cutoff '+cutoff.isoformat()+' UTC; the server holds every stored record.',flush=True)
         if first:
             ids=range(start,-1,-1)
-            print('Prvni 3mesicni synchronizace, plus ochranna rezerva za hranici data.',flush=True)
+            print('First window scan, plus a guard margin past the cutoff.',flush=True)
         else:
             ids=sorted((i for i in missing if i>=lowest),reverse=True)
             skipped=(start-lowest+1)-len(ids)
-            print(f'Prirustkova synchronizace: ID {start} az {lowest}, serveru chybi {len(ids)}.',flush=True)
+            print(f'Incremental sync: ids {start} down to {lowest}, the server lacks {len(ids)}.',flush=True)
         total=None if first else len(ids)
         first_old=None
         older_valid=0
@@ -89,7 +89,7 @@ def sync_recent(archive, info, desired=None, delay=0.10, months=3,
                 continue
             if desired is not None and processed>=desired:
                 incomplete=True
-                print('Dosazen volitelny limit cteni; pokracuj dalsim spustenim.',flush=True)
+                print('Read limit reached; the next run continues.',flush=True)
                 break
             for attempt in range(RETRIES+1):
                 reply=dev.read(idx)
@@ -107,7 +107,7 @@ def sync_recent(archive, info, desired=None, delay=0.10, months=3,
                 archive.flush()
             if consecutive_errors>=MAX_CONSECUTIVE_ERRORS:
                 incomplete=True
-                print('Preruseno po opakovanych USB chybach. Odeslana data zustavaji na serveru.',flush=True)
+                print('Stopped after repeated USB errors; what was sent stays on the server.',flush=True)
                 break
             time.sleep(delay)
             scanned_floor=idx
@@ -122,18 +122,18 @@ def sync_recent(archive, info, desired=None, delay=0.10, months=3,
             if when is not None:
                 if prev_valid and prev_valid[0]==idx+1 and abs((prev_valid[1]-when).days)>30:
                     warned=True
-                    print('POZOR: neobvykly skok hodin mezi ID',idx+1,'a',idx,
-                          '- stara data mohou mit CHYBNE casy.',flush=True)
+                    print('WARNING: unusual clock jump between ids',idx+1,'and',idx,
+                          '- older records may carry wrong times.',flush=True)
                 prev_valid=(idx,when)
                 if when<cutoff:
                     if first_old is None:
                         first_old=idx
-                        print('Dosazena casova hranice na ID',idx,
-                              '- overuji jeste ochranny presah.',flush=True)
+                        print('Cutoff reached at id',idx,
+                              '- reading the guard margin.',flush=True)
                     older_valid+=1
                 elif first_old is not None:
                     # Nonmonotone timestamps across IDs: can't trust one old ID.
-                    print('POZOR: casove poradi archivu neni monotoni na ID',idx,flush=True)
+                    print('WARNING: archive times are not monotonic at id',idx,flush=True)
                     warned=True
                     first_old=None
                     older_valid=0
@@ -143,20 +143,20 @@ def sync_recent(archive, info, desired=None, delay=0.10, months=3,
                     break
                 if extra_ids>=AFTER_OLD_MAX_IDS:
                     warned=True
-                    print('POZOR: konec ochranneho presahu; u zarizeni se spatnymi'
-                          ' hodinami nelze zarucit skutecne 3mesicni pokryti.',flush=True)
+                    print('WARNING: guard margin exhausted; with a wrong device clock'
+                          ' the window coverage is not guaranteed.',flush=True)
                     break
         complete = errors==0 and not incomplete
         archive.flush(next_index=next_idx if complete else None, range_complete=complete)
         if complete:
-            print('Běžná synchronizace dokončena.',flush=True)
+            print('Sync complete.',flush=True)
             if warned:
-                print('VAROVANI: zaznamenan mozne chybny cas. '
-                      'Pro kontrolu je dostupne stazeni cele historie z webu.',flush=True)
+                print('WARNING: a suspicious clock was seen; a full history download '
+                      'from the web can check it.',flush=True)
         else:
-            print('Synchronizace nekompletni; pristi spusteni doplni chybejici ID.',flush=True)
-        print(f'Vysledek: nove dotazy {processed}, detailni {filled}, prazdne {empty},'
-              f' preskocene {skipped}, chyby {errors}; nejstarsi prohledane ID {scanned_floor}.',flush=True)
+            print('Sync incomplete; the next run fills the missing ids.',flush=True)
+        print(f'Result: read {processed}, detailed {filled}, empty {empty},'
+              f' skipped {skipped}, errors {errors}; lowest id scanned {scanned_floor}.',flush=True)
         return errors==0  # --count partial sync is intentional, not a failure
     finally:
         if own_device:

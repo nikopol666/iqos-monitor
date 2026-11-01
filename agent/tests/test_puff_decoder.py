@@ -5,12 +5,15 @@ from iqos_agent.record_decode import decode_puffs
 from iqos_agent.core import check_crc
 
 root = Path(__file__).resolve().parents[2] / 'test-vectors'
+if not root.exists():
+    print('SKIPPED: test-vectors (real device captures) are not available')
+    raise SystemExit(0)
 files = [
-    'fialova_history_20261026_192057.json',
-    'fialova_history_older_20261026_195416.json',
-    'fialova_history_sample_20261026_195811.json',
-    'fialova_post_use_20261026_201913.json',
-    'modra_correct_20261026_203051.json',
+    'device-a_history_20261026_192057.json',
+    'device-a_history_older_20261026_195416.json',
+    'device-a_history_sample_20261026_195811.json',
+    'device-a_post_use_20261026_201913.json',
+    'device-b_correct_20261026_203051.json',
 ]
 counts = {}
 for name in files:

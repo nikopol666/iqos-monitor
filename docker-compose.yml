@@ -1,5 +1,5 @@
 # IQOS Monitor – one container: web UI + API + SQLite.
-# Paste into Portainer or save as docker-compose.yml, then:  docker compose up -d
+# Save as docker-compose.yml, then:  docker compose up -d
 # Optional overrides (environment or .env): IQOS_PORT, TZ, DISPLAY_TZ, AGENT_API_KEY, IQOS_TAG.
 
 services:

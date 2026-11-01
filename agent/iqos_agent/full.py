@@ -34,31 +34,31 @@ def sync_full(archive, info, desired=None, delay=0.10, device_factory=IQOSDevice
     try:
         next_index = dev.next_index()
         if not 1 <= next_index <= 0x1000000:
-            raise RuntimeError('Metadata returned invalid next history index')
+            raise RuntimeError('Metadata returned an invalid next history index')
         start = next_index - 1
         state = archive.sync_state(0, start, full=True)
         acked = state.get('acked_next_index')
         if state.get('full_history_complete') and acked is not None and next_index < acked:
             raise RuntimeError(
-                f'Index historie klesl z {acked} na {next_index}. '
-                'Mozny reset/cyklovani archivu; synchronizace zastavena, aby '
-                'nedoslo k zamene ID starych zaznamu.')
+                f'History index went down from {acked} to {next_index}: '
+                'possible archive reset or wrap; stopping so old ids are not '
+                'mixed up with new records.')
         missing = sorted(state['missing'], reverse=True)
         remaining = len(missing)
         skipped = (start + 1) - remaining
-        print(f'Metadata: next_index={next_index}; serveru chybi {remaining} z {start + 1} indexu.', flush=True)
+        print(f'Metadata: next_index={next_index}; the server lacks {remaining} of {start + 1} ids.', flush=True)
         if desired is not None:
-            print(f'Pozor: testovaci limit = {desired} NOVYCH dotazu.', flush=True)
+            print(f'Note: read limit = {desired} new ids.', flush=True)
 
         completed_range = True
         for idx in missing:
             if should_stop is not None and should_stop():
                 completed_range = False
-                print('Zastaveno na zadost uzivatele.', flush=True)
+                print('Stopped on request.', flush=True)
                 break
             if desired is not None and processed >= desired:
                 completed_range = False
-                print('Dosazen volitelny limit. Zbytek nacteme priste.', flush=True)
+                print('Read limit reached; the rest next time.', flush=True)
                 break
 
             # Retry temporary errors; never loop infinitely on a broken device.
@@ -82,13 +82,13 @@ def sync_full(archive, info, desired=None, delay=0.10, device_factory=IQOSDevice
 
             if processed <= 5 or processed % 100 == 0 or reply.status not in GOOD:
                 print(f'  id={idx:<8} {reply.status:<13} {timestamp or ""} '
-                      f'(nove {processed}, na serveru/preskocene {skipped})', flush=True)
+                      f'(new {processed}, already on the server {skipped})', flush=True)
             if processed % FLUSH_EVERY == 0:
                 archive.flush()
             if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
                 completed_range = False
-                print('STOP: opakovane chyby USB. Odeslana data zustavaji na serveru. '
-                      'Zkontroluj kabel a spust synchronizaci znovu.', flush=True)
+                print('STOP: repeated USB errors; what was sent stays on the server. '
+                      'Check the cable and run again.', flush=True)
                 break
             time.sleep(delay)
             if on_step is not None:
@@ -100,13 +100,13 @@ def sync_full(archive, info, desired=None, delay=0.10, device_factory=IQOSDevice
             completed_range = False
         archive.flush(next_index=next_index if completed_range else None, range_complete=completed_range)
         if completed_range:
-            print('HOTOVO: cely dostupny rozsah je na serveru. '
-                  'Pristi spusteni stahne pouze nova ID.', flush=True)
+            print('DONE: the whole archive is on the server; '
+                  'later runs read only new ids.', flush=True)
         else:
-            print('NEUPLNE: odeslane zaznamy jsou na serveru; '
-                  'dalsi spusteni navaze a doplni chybejici ID.', flush=True)
-        print(f'Souhrn: nacteno {processed}; detailni {new_full}; '
-              f'prazdne {new_empty}; preskoceno {skipped}; chyby {errors}', flush=True)
+            print('INCOMPLETE: what was read is on the server; '
+                  'the next run continues with the missing ids.', flush=True)
+        print(f'Summary: read {processed}; detailed {new_full}; '
+              f'empty {new_empty}; skipped {skipped}; errors {errors}', flush=True)
         return completed_range
     finally:
         if own_device:

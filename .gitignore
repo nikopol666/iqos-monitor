@@ -26,3 +26,6 @@ notes/
 IQOS-History/
 *.pcapng
 server/AGENTS.md
+test-vectors/
+agent/dist*/
+agent/build/

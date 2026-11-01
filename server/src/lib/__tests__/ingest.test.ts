@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { readFileSync, mkdtempSync } from "node:fs";
+import { existsSync, readFileSync, mkdtempSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 const VECTORS = path.resolve(__dirname, "../../../../test-vectors");
+// Real device captures stay out of the repository; the tests that need them skip without it.
+const HAVE_VECTORS = existsSync(VECTORS);
 process.env.DATABASE_PATH = path.join(mkdtempSync(path.join(os.tmpdir(), "iqos-test-")), "test.sqlite3");
 
 // Imported after DATABASE_PATH is set so the module opens the temp file.
@@ -18,8 +20,8 @@ describe("ingestEvents", () => {
   const serial = "DEVICEA0000001";
   beforeAll(() => ingest.ensureDevice(serial));
 
-  it("stores, decodes and acknowledges; never overwrites ok rows", () => {
-    const rows = capture("fialova_post_use_20261026_201913.json");
+  it.skipIf(!HAVE_VECTORS)("stores, decodes and acknowledges; never overwrites ok rows", () => {
+    const rows = capture("device-a_post_use_20261026_201913.json");
     const r1 = ingest.ingestEvents(
       serial,
       rows.map((r) => ({ event_id: r.id, status: r.status, response_hex: r.response_hex })),
@@ -42,9 +44,9 @@ describe("ingestEvents", () => {
     expect(r3.updated).toBe(1);
   });
 
-  it("flags adjacent ids with a >30 day jump as clock suspects", async () => {
+  it.skipIf(!HAVE_VECTORS)("flags adjacent ids with a >30 day jump as clock suspects", async () => {
     const sqlite = getSqlite();
-    const base = capture("fialova_post_use_20261026_201913.json")[0].response_hex;
+    const base = capture("device-a_post_use_20261026_201913.json")[0].response_hex;
     // Build two frames with ids 200/201 and times five months apart using the
     // same trick as the Python tests (patch id, seconds, CRC).
     const { crc16 } = await import("../protocol/crc");
@@ -145,7 +147,7 @@ describe("ingestEvents", () => {
     expect(ingest.missingIds(s, 5, 7)).toEqual([6]);
   });
 
-  it("lists the archive ids the server still lacks", () => {
+  it.skipIf(!HAVE_VECTORS)("lists the archive ids the server still lacks", () => {
     const all = ingest.missingIds("UNKNOWN0000000", 0, 4);
     expect(all).toEqual([0, 1, 2, 3, 4]);
     const stored = getSqlite().prepare("SELECT event_id FROM events WHERE serial = ? AND status IN ('ok','empty') ORDER BY event_id").all(serial) as { event_id: number }[];

@@ -5,6 +5,9 @@ from iqos_agent.core import (FrameCollector, check_crc, extract_datetime,
                        IQOSDevice, METADATA_REQUEST, history_request, Reply)
 
 ROOT = Path(__file__).resolve().parents[2] / 'test-vectors'
+if not ROOT.exists():
+    print('SKIPPED: test-vectors (real device captures) are not available')
+    raise SystemExit(0)
 
 class DummyHID:
     def __init__(self, frames):
@@ -19,8 +22,8 @@ class DummyHID:
 
 # Check CRC-16, request builder and segment assembly with two real devices.
 for file, expected_id, expected_time in (
-    ('fialova_post_use_20261026_201913.json',1076,'2026-10-26T19:02:00+00:00'),
-    ('modra_correct_20261026_203051.json',10487,'2026-10-26T19:07:01+00:00')
+    ('device-a_post_use_20261026_201913.json',1076,'2026-10-26T19:02:00+00:00'),
+    ('device-b_correct_20261026_203051.json',10487,'2026-10-26T19:07:01+00:00')
 ):
     data=json.loads((ROOT/file).read_text())
     record=next(r for r in data['results'] if r['id']==expected_id)
