@@ -1,5 +1,5 @@
 import { badRequest, json } from "@/lib/api";
-import { listDevicesLabeled as listDevices, statsFor } from "@/lib/queries";
+import { avgSessionSeconds, listDevicesLabeled as listDevices, statsFor } from "@/lib/queries";
 import { isDateKey, addDays, todayKey } from "@/lib/time";
 import type { GroupBy } from "@/lib/stats";
 
@@ -30,8 +30,10 @@ export async function GET(request: Request) {
   // Suspect-clock records are hidden unless suspect=1 is passed.
   const excludeSuspect = url.searchParams.get("suspect") !== "1";
   const result = statsFor({ serials, from, to, groupBy: group, excludeSuspect });
+  const sessionLength = avgSessionSeconds(serials, from, to);
   return json({
     ...result,
+    sessionLength,
     serials,
     excludeSuspect,
     devices: all.filter((d) => serials.includes(d.serial)).map((d) => ({ serial: d.serial, name: d.name, color: d.color })),

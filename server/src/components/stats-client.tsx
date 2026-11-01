@@ -21,7 +21,13 @@ interface UserOpt {
   name: string;
   color: string;
 }
-type StatsResponse = StatsResult & { serials: string[]; suspectHidden: number; previous: StatTotals | null; devices: { serial: string; name: string; color: string }[] };
+type StatsResponse = StatsResult & {
+  serials: string[];
+  suspectHidden: number;
+  previous: StatTotals | null;
+  sessionLength: { seconds: number | null; sticks: number; intervals: number };
+  devices: { serial: string; name: string; color: string }[];
+};
 
 interface View {
   from: string;
@@ -357,7 +363,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
         {data ? (
           <>
             {/* KPI row: the two numbers that matter for any range come first. */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               <Kpi
                 label={t.stats.avgSticksPerDay}
                 value={fmt.number(data.totals.avgSessionsPerDay)}
@@ -372,6 +378,11 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
               />
               <Kpi label={t.stats.totalSessions} value={fmt.integer(data.totals.sessions)} delta={deltaText(data.totals.sessions, data.previous?.sessions)} hint={`${t.stats.totalRecords}: ${fmt.integer(data.totals.records)}`} />
               <Kpi label={t.stats.totalPuffs} value={fmt.integer(data.totals.puffs)} delta={deltaText(data.totals.puffs, data.previous?.puffs)} />
+              <Kpi
+                label={t.stats.stickDuration}
+                value={data.sessionLength.seconds == null ? "—" : `${fmt.number(Math.round(data.sessionLength.seconds / 6) / 10)} min`}
+                hint={data.sessionLength.seconds == null ? t.stats.stickDurationNone : f(t.stats.stickDurationHint, { sticks: fmt.integer(data.sessionLength.sticks), n: data.sessionLength.intervals })}
+              />
             </div>
 
             {data.totals.records === 0 ? (

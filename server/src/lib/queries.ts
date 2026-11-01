@@ -129,6 +129,51 @@ export function usageSeconds(agentSeconds: number | null): number | null {
   return agentSeconds == null ? null : Math.round((agentSeconds * 4) / USAGE_TICKS_PER_SECOND);
 }
 
+/**
+ * Average session length from the device's usage counter: between two
+ * connections the counter grew by X ticks while N sticks were smoked, so a
+ * stick lasted X / 2.5 / N seconds on average. Only connection pairs whose
+ * later reading falls inside [from, to] count. Returns null without data.
+ */
+export function avgSessionSeconds(serials: string[], from: string, to: string): { seconds: number | null; sticks: number; intervals: number } {
+  if (!serials.length) return { seconds: null, sticks: 0, intervals: 0 };
+  const { startUtc, endUtcExclusive } = localDayRangeUtc(from, to);
+  const rows = getDb()
+    .select({ serial: schema.snapshots.serial, collectedUtc: schema.snapshots.collectedUtc, valuesJson: schema.snapshots.valuesJson })
+    .from(schema.snapshots)
+    .where(inArray(schema.snapshots.serial, serials))
+    .orderBy(schema.snapshots.serial, schema.snapshots.id)
+    .all();
+  let ticks = 0;
+  let sticks = 0;
+  let intervals = 0;
+  let prev: { serial: string; sticks: number; ticks: number } | null = null;
+  for (const r of rows) {
+    let v: Record<string, unknown> = {};
+    try {
+      v = JSON.parse(r.valuesJson) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const s = typeof v.lifetime_sticks_candidate === "number" ? v.lifetime_sticks_candidate : null;
+    const q = typeof v.lifetime_seconds_candidate === "number" ? v.lifetime_seconds_candidate * 4 : null; // agent reports ticks / 4
+    if (s == null || q == null) continue;
+    const cur = { serial: r.serial, sticks: s, ticks: q };
+    if (prev && prev.serial === r.serial) {
+      const ds = cur.sticks - prev.sticks;
+      const dq = cur.ticks - prev.ticks;
+      const at = new Date(r.collectedUtc);
+      if (ds > 0 && dq > 0 && at >= startUtc && at < endUtcExclusive) {
+        ticks += dq;
+        sticks += ds;
+        intervals++;
+      }
+    }
+    prev = cur;
+  }
+  return { seconds: sticks ? Math.round(ticks / USAGE_TICKS_PER_SECOND / sticks) : null, sticks, intervals };
+}
+
 export function overview(): DeviceOverview[] {
   const all = listDevices();
   return all.map((d) => deviceOverview(d, all));
