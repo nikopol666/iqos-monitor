@@ -107,6 +107,20 @@ describe("ingestEvents", () => {
     expect(dev.full_history_complete).toBe(1);
   });
 
+  it("live samples ignore the seconds counter but follow charging", () => {
+    const s = "SAMPLE00000001";
+    ingest.ensureDevice(s);
+    const count = () => (getSqlite().prepare("SELECT count(*) c FROM live_samples WHERE serial = ?").get(s) as { c: number }).c;
+    ingest.updateLive(s, null, { battery: 80, charging: true, lifetime_seconds: 100 });
+    const base = count();
+    ingest.updateLive(s, null, { battery: 80, charging: true, lifetime_seconds: 101.25 });
+    expect(count()).toBe(base);
+    ingest.updateLive(s, null, { battery: 80, charging: false, lifetime_seconds: 102 });
+    expect(count()).toBe(base + 1);
+    const last = getSqlite().prepare("SELECT extra_json FROM live_samples WHERE serial = ? ORDER BY id DESC LIMIT 1").get(s) as { extra_json: string };
+    expect(JSON.parse(last.extra_json).lifetime_seconds).toBe(102);
+  });
+
   it("lists the archive ids the server still lacks", () => {
     const all = ingest.missingIds("UNKNOWN0000000", 0, 4);
     expect(all).toEqual([0, 1, 2, 3, 4]);

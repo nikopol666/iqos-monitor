@@ -225,6 +225,17 @@ export interface IncomingLive {
   charging?: boolean | null;
 }
 
+/** The part of extra_json whose change is worth a live sample. */
+function trackedExtra(json: string | null): string {
+  if (!json) return "";
+  try {
+    const e = JSON.parse(json) as Record<string, unknown>;
+    return JSON.stringify([e.brightness_level ?? null, e.status_60_raw ?? null, e.battery_temp_c ?? null, e.charging ?? null, e.error_state ?? null]);
+  } catch {
+    return json;
+  }
+}
+
 export function updateLive(serial: string, agentId: number | null, live: IncomingLive): void {
   const db = getDb();
   const now = nowUtc();
@@ -242,7 +253,17 @@ export function updateLive(serial: string, agentId: number | null, live: Incomin
     sessionRaw: live.session_raw ?? null,
     syncStatus: live.sync_status ?? null,
     disconnectedUtc: live.connected === false ? now : null,
-    extraJson: JSON.stringify({ brightness_level: live.brightness_level ?? null, status_60_raw: live.status_60_raw ?? null, battery_temp_c: live.battery_temp_c ?? null, charging: live.charging ?? null }),
+    extraJson: JSON.stringify({
+      brightness_level: live.brightness_level ?? null,
+      status_60_raw: live.status_60_raw ?? null,
+      battery_temp_c: live.battery_temp_c ?? null,
+      charging: live.charging ?? null,
+      // Research fields: carried along with every sample, but a change in them
+      // alone (the seconds counter ticks during every session) writes no sample.
+      lifetime_seconds: live.lifetime_seconds == null ? null : Math.round(live.lifetime_seconds * 4) / 4,
+      error_state: live.error_state ?? null,
+      session_raw: live.session_raw ?? null,
+    }),
   };
   if (live.connected === false) {
     // Keep the last known values, only mark the disconnect.
@@ -263,7 +284,7 @@ export function updateLive(serial: string, agentId: number | null, live: Incomin
     prev.stickState !== next.stickState ||
     prev.lifetimeSticks !== next.lifetimeSticks ||
     prev.lifetimePuffs !== next.lifetimePuffs ||
-    prev.extraJson !== next.extraJson;
+    trackedExtra(prev.extraJson) !== trackedExtra(next.extraJson);
   if (changed) {
     db.insert(schema.liveSamples)
       .values({ serial, atUtc: now, battery: next.battery, stickState: next.stickState, lifetimeSticks: next.lifetimeSticks, lifetimePuffs: next.lifetimePuffs, extraJson: next.extraJson })

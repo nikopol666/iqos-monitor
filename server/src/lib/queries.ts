@@ -270,6 +270,17 @@ export function eventPage(serial: string, offset: number, limit: number, status?
   };
 }
 
+/** Live samples for research/export, oldest first, optionally from a timestamp. */
+export function liveSamplesSince(serial: string, sinceUtc: string | null, limit = 5000): schema.LiveSample[] {
+  const conds = [eq(schema.liveSamples.serial, serial)];
+  if (sinceUtc) conds.push(gte(schema.liveSamples.atUtc, sinceUtc));
+  return getDb().select().from(schema.liveSamples).where(and(...conds)).orderBy(schema.liveSamples.id).limit(limit).all();
+}
+
+export function listSnapshots(serial: string, limit = 100): schema.Snapshot[] {
+  return getDb().select().from(schema.snapshots).where(eq(schema.snapshots.serial, serial)).orderBy(desc(schema.snapshots.id)).limit(limit).all();
+}
+
 export function recentLiveSamples(serial: string, limit = 50): schema.LiveSample[] {
   return getDb().select().from(schema.liveSamples).where(eq(schema.liveSamples.serial, serial)).orderBy(desc(schema.liveSamples.id)).limit(limit).all();
 }
