@@ -30,9 +30,22 @@ profiles that group devices.
   render of its finish and its own chart colour.
 - English and Czech, light and dark theme, phone-friendly.
 
-| Statistics | Device | Phone |
-|---|---|---|
-| ![Statistics](docs/screenshots/statistics.png) | ![Device](docs/screenshots/device.png) | ![Phone](docs/screenshots/overview-phone.png) |
+### Statistics
+
+Day, week or month with arrows, or any range; sticks per day, puffs per
+stick, stick duration, distributions by hour and weekday.
+
+![Statistics](docs/screenshots/statistics.png)
+
+### Device
+
+Diagnostics, archive, faulty records and the settings the official app offers.
+
+![Device](docs/screenshots/device.png)
+
+### On a phone
+
+<img src="docs/screenshots/overview-phone.png" alt="Overview on a phone" width="360">
 
 ## How it works
 
