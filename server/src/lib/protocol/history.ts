@@ -93,17 +93,22 @@ export interface DecodedEvent {
  * Normalise an incoming (status, response_hex) the same way the agent's
  * storage.save_event / import_json_files do, and decode it.
  */
+/** Seconds per unit of a puff pair's byte 0. */
+export const PUFF_TIME_UNIT_S = 2;
+
 /**
- * Byte 0 of every puff pair is the puff's time in seconds since the session
- * started (consistent with the device's last-session register on 8 sessions:
- * the last puff always falls before the session end, the first after the
- * heat-up). Returns [first, last] seconds or null.
+ * Byte 0 of every puff pair is the puff's time since the session started in
+ * 2-second units. Evidence (PROTOCOL.md): the last puff always lands a few
+ * seconds before the next session starts (consecutive records 4–7 min
+ * apart), capped sessions end at 360 s, the first puff comes 18–22 s after
+ * the start (heat-up), and the last-session register's length field equals
+ * 2 × last byte 0 + 2–9 s on eight sessions. Returns seconds.
  */
 export function puffSpan(pairs: string[] | null | undefined): { first: number; last: number } | null {
   if (!pairs || !pairs.length) return null;
   const times = pairs.map((p) => parseInt(p.slice(0, 2), 16)).filter((n) => Number.isFinite(n));
   if (!times.length) return null;
-  return { first: Math.min(...times), last: Math.max(...times) };
+  return { first: Math.min(...times) * PUFF_TIME_UNIT_S, last: Math.max(...times) * PUFF_TIME_UNIT_S };
 }
 
 export function decodeEvent(status: string, responseHex: string | null | undefined, now?: Date): DecodedEvent {

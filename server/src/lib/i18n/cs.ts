@@ -192,7 +192,7 @@ export const cs: Dictionary = {
     srcTempCorr: "Chová se jako teplota: při nabíjení roste, pak klesá; registr 0x84 ji sleduje (r ≈ 0,9). Oficiální aplikace ji neukazuje, capture ji potvrdit nemůže.",
     srcVoltCorr: "Sleduje surové napětí baterie z registru 0x60 (r = 0,89 na 10 snímcích, stejná jednotka, posun ≈ +300). iqos-bar tomu říká napětí.",
     srcTempCorr84: "Sleduje teplotu baterie z registru 0x60 (r = 0,91–0,96 na snímcích). iqos-bar tomu říká teplota; jednotky neznámé.",
-    srcHoursUnit: "Čítač zařízení tiká ≈2,5× za sekundu relace (dvě změřené relace: 648 tiků / 256 s, 820 tiků / 335 s), ne 4× jak předpokládá iqos-bar. Zobrazeno s naměřenou rychlostí; další změřené relace ji zpřesní.",
+    srcHoursUnit: "Čítač zařízení tiká ≈2,4× za sekundu relace (osm relací změřených proti délce relace, kterou hlásí samo zařízení), ne 4× jak předpokládá iqos-bar. Zobrazeno s naměřenou rychlostí.",
     srcDerived: "Odvozeno z ověřených hodnot",
     settingsTitle: "Nastavení zařízení",
     settingsHint: "Změny posílá agent přesně těmi rámci, které byly zachyceny z oficiální aplikace, a hodnotu po zápisu znovu přečte.",

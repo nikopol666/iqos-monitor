@@ -190,7 +190,7 @@ export const en = {
     srcTempCorr: "Behaves like a temperature: rises while charging, falls afterwards; register 0x84 tracks it (r ≈ 0.9). The official app does not show it, so no capture can confirm it.",
     srcVoltCorr: "Tracks the raw battery voltage of register 0x60 (r = 0.89 on 10 snapshots, same unit, offset ≈ +300). iqos-bar calls it voltage.",
     srcTempCorr84: "Tracks the battery temperature of register 0x60 (r = 0.91–0.96 on snapshots). iqos-bar calls it temperature; units unknown.",
-    srcHoursUnit: "The device counter ticks ≈2.5× per second of a session (two timed sessions: 648 ticks / 256 s, 820 ticks / 335 s), not 4× as iqos-bar assumes. Shown with the measured rate; more timed sessions would refine it.",
+    srcHoursUnit: "The device counter ticks ≈2.4× per second of a session (eight sessions measured against the device's own session length), not 4× as iqos-bar assumes. Shown with the measured rate.",
     srcDerived: "Derived from verified values",
     settingsTitle: "Device settings",
     settingsHint: "Changes are sent by the agent with the exact frames captured from the official app and read back from the device.",

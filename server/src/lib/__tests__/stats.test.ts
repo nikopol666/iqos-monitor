@@ -38,9 +38,9 @@ describe("computeStats", () => {
     expect(r.byWeekday).toHaveLength(7);
     expect(r.byHour.reduce((a, b) => a + b, 0)).toBe(r.totals.sessions);
     expect(r.byWeekday.reduce((a, b) => a + b, 0)).toBe(r.totals.sessions);
-    expect(r.totals.avgLastPuffS).toBe(137);
-    expect(r.totals.avgFirstPuffS).toBe(19);
-    expect(r.buckets.find((b) => b.sessions > 0 && b.avgLastPuffS != null)?.avgLastPuffS).toBe(137);
+    expect(r.totals.avgLastPuffS).toBe(274);
+    expect(r.totals.avgFirstPuffS).toBe(38);
+    expect(r.buckets.find((b) => b.sessions > 0 && b.avgLastPuffS != null)?.avgLastPuffS).toBe(274);
     expect(r.buckets.map((b) => b.key)).toEqual(["2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28"]);
     expect(r.buckets[1]).toMatchObject({ records: 2, sessions: 1, puffs: 18 });
     expect(r.buckets[2]).toMatchObject({ records: 1, sessions: 1, puffs: 14, suspect: 1 });
