@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import type { ShortTermStats } from "@/lib/shortterm";
@@ -27,16 +27,19 @@ export function ShortTermClient({ initial, userId, initialIncludeToday = false }
   // The initial payload matches the initial switch position only.
   const [data, setData] = useState(initial);
 
+  // The server-rendered payload is only valid for the first switch position;
+  // any later change of user or switch fetches and shows fresh data at once.
+  const firstRun = useRef(true);
   useEffect(() => {
     let active = true;
-    let last = initial && includeToday === initialIncludeToday ? JSON.stringify(initial) : "";
-    const load = async () => {
+    let last = "";
+    const load = async (force: boolean) => {
       try {
         const res = await fetch(`/api/shortterm?user=${userId}&today=${includeToday ? 1 : 0}`, { cache: "no-store" });
         if (!res.ok || !active) return;
         const next = (await res.json()) as Payload;
         const json = JSON.stringify(next);
-        if (json !== last) {
+        if (force || json !== last) {
           last = json;
           setData(next);
         }
@@ -44,13 +47,19 @@ export function ShortTermClient({ initial, userId, initialIncludeToday = false }
         /* keep last */
       }
     };
-    if (!initial || includeToday !== initialIncludeToday) void load();
-    const id = setInterval(load, 60_000);
+    if (firstRun.current) {
+      firstRun.current = false;
+      if (initial) last = JSON.stringify(initial);
+      else void load(true);
+    } else {
+      void load(true);
+    }
+    const id = setInterval(() => void load(false), 60_000);
     return () => {
       active = false;
       clearInterval(id);
     };
-  }, [initial, userId, includeToday, initialIncludeToday]);
+  }, [initial, userId, includeToday]);
 
   function toggleToday(next: boolean) {
     setIncludeToday(next);
