@@ -71,19 +71,33 @@ IQOS ──USB HID──▶ Agent (Windows tray, Python) ──HTTP, API key─�
 
 ## Install the server
 
-Requirements: a Docker host on your LAN (Linux x86-64 images are published).
+Requirements: a Docker host on your LAN (Linux x86-64 images are published
+to GHCR on every release). One container, nothing else to set up.
 
-```bash
-mkdir iqos-monitor && cd iqos-monitor
-curl -LO https://raw.githubusercontent.com/nikopol666/iqos/main/docker-compose.yml
-echo "GHCR_OWNER=nikopol666" > .env
-docker compose pull
-docker compose up -d
+```yaml
+services:
+  iqos-monitor:
+    image: ghcr.io/nikopol666/iqos-monitor:latest
+    container_name: iqos-monitor
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      TZ: Europe/Prague
+      DISPLAY_TZ: Europe/Prague
+    volumes:
+      - iqos-data:/data
+
+volumes:
+  iqos-data:
 ```
 
-Open `http://<host>:3000`. The database lives in the `iqos-data` volume
-(`/data/iqos.sqlite3`); a bind mount works too, the container fixes the
-directory permissions itself at start.
+Paste it into Portainer or save it as `docker-compose.yml` and run
+`docker compose up -d`. Open `http://<host>:3000`. The database lives in the
+`iqos-data` volume (`/data/iqos.sqlite3`); a bind mount such as
+`/srv/iqos/data:/data` works too, the container fixes the directory
+permissions itself at start. The full file with every option is
+[docker-compose.yml](docker-compose.yml).
 
 Environment variables (see `docker-compose.yml`):
 
@@ -123,17 +137,14 @@ after a download. In that case run the agent from source: install Python 3,
 `agent\run_agent.vbs` (it starts `pythonw.exe` without a console; the tray's
 *Start with Windows* registers that launcher).
 
-## Daily use
+## Using it
 
-- The **overview** is one person's page; pick the person at the top when
-  there are several. The 7-day card excludes today by default because today
-  is not over; a switch includes it.
-- **Statistics** remember nothing but what you choose; the week start follows
-  the language and can be set per browser in *Settings → Display*.
-- A device's **finish, colour, name and owner** are set in *Settings → Devices*.
-- **Faulty records** (invalid reads or a suspicious clock) can be deleted
-  from the device page. A deleted record is not read again automatically but
-  returns with a full history download; a blocked one is never read again.
+Page by page: [docs/user-guide.md](docs/user-guide.md). In short: the
+**overview** is one person's page with the connected devices, today and this
+week; **statistics** page through days, weeks and months or any range; the
+**device page** holds diagnostics, the archive, faulty records and the
+device settings; **settings** manage people, devices, agent keys, language,
+theme and the week start.
 
 ## Supported devices
 

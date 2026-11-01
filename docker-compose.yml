@@ -1,14 +1,10 @@
-# IQOS Monitor – single container: web UI + API + SQLite on a named volume.
-#
-#   docker login ghcr.io            # PAT with read:packages (private image)
-#   docker compose pull && docker compose up -d
-#
-# Local build instead of the registry image:
-#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# IQOS Monitor – one container: web UI + API + SQLite.
+# Paste into Portainer or save as docker-compose.yml, then:  docker compose up -d
+# Optional overrides (environment or .env): IQOS_PORT, TZ, DISPLAY_TZ, AGENT_API_KEY, IQOS_TAG.
 
 services:
   iqos-monitor:
-    image: ghcr.io/${GHCR_OWNER:-OWNER}/iqos-monitor:${IQOS_TAG:-latest}
+    image: ghcr.io/nikopol666/iqos-monitor:${IQOS_TAG:-latest}
     container_name: iqos-monitor
     restart: unless-stopped
     ports:
