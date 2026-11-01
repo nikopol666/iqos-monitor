@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, ChevronUp, SlidersHorizontal } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, CartesianGrid, ComposedChart, LabelList, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useFormat, useI18n } from "@/lib/i18n/client";
-import type { StatsResult, GroupBy, Bucket } from "@/lib/stats";
+import type { StatsResult, GroupBy, Bucket, StatTotals } from "@/lib/stats";
 import type { DayRecord } from "@/lib/queries";
-import { Card, CardTitle, Notice, Stat } from "@/components/ui";
+import { Card, CardTitle, Notice } from "@/components/ui";
 import { colorCss } from "@/lib/palette";
 
 interface DeviceOpt {
@@ -21,13 +21,16 @@ interface UserOpt {
   name: string;
   color: string;
 }
-type StatsResponse = StatsResult & { serials: string[]; suspectHidden: number; devices: { serial: string; name: string; color: string }[] };
+type StatsResponse = StatsResult & { serials: string[]; suspectHidden: number; previous: StatTotals | null; devices: { serial: string; name: string; color: string }[] };
 
 interface View {
   from: string;
   to: string;
   group: GroupBy;
 }
+
+const TOOLTIP_STYLE = { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--text)" } as const;
+const AXIS_TICK = { fontSize: 11, fill: "var(--text-2)" } as const;
 
 /** Current width of an element, kept up to date with ResizeObserver. */
 function useElementWidth(ref: React.RefObject<HTMLDivElement | null>): number {
@@ -48,12 +51,44 @@ function shiftDays(key: string, n: number): string {
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
 
+/** Grouping that reads best for a range length. */
+function autoGroup(days: number | null): GroupBy {
+  return days === null || days >= 365 ? "month" : days >= 90 ? "week" : "day";
+}
+
+/** One-row segmented control: the active option is unmistakable. */
+function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { key: T; label: string }[]; onChange: (v: T) => void }) {
+  return (
+    <div className="flex items-center gap-2" role="radiogroup" aria-label={label}>
+      <span className="hidden text-xs text-text-2 sm:inline">{label}</span>
+      <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5">
+        {options.map((o) => {
+          const active = o.key === value;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(o.key)}
+              className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${active ? "bg-accent text-accent-ink shadow-sm" : "text-text-2 hover:text-text"}`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function StatsClient({ devices, users, defaultFrom, defaultTo }: { devices: DeviceOpt[]; users: UserOpt[]; defaultFrom: string; defaultTo: string }) {
   const { t, f } = useI18n();
   const fmt = useFormat();
   // Default 90-day range reads better by week; day grouping stays one click away.
   const [view, setView] = useState<View>({ from: defaultFrom, to: defaultTo, group: "week" });
   const [history, setHistory] = useState<View[]>([]);
+  const { from, to, group } = view;
   const [userId, setUserId] = useState<string>("");
   const [serial, setSerial] = useState<string>("");
   const [includeSuspect, setIncludeSuspect] = useState(false);
@@ -63,8 +98,6 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
   const [error, setError] = useState<string | null>(null);
   const [drill, setDrill] = useState<{ bucket: Bucket; items: DayRecord[] | null } | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-
-  const { from, to, group } = view;
 
   const scopeParams = useCallback(() => {
     const params = new URLSearchParams();
@@ -106,13 +139,13 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
     { key: "year", label: t.stats.presets.year, days: 365 },
     { key: "all", label: t.stats.presets.all, days: null },
   ];
-  function applyPreset(days: number | null) {
+  const presetFrom = (days: number | null) => (days === null ? "2015-01-01" : shiftDays(defaultTo, -(days - 1)));
+  const activePreset = presets.find((p) => from === presetFrom(p.days) && to === defaultTo)?.key ?? "custom";
+  function applyPreset(key: string) {
+    const p = presets.find((x) => x.key === key);
+    if (!p) return;
     setHistory([]);
-    setView({
-      to: defaultTo,
-      from: days === null ? "2015-01-01" : shiftDays(defaultTo, -(days - 1)),
-      group: days === null || days >= 365 ? "month" : days >= 90 ? "week" : "day",
-    });
+    setView({ to: defaultTo, from: presetFrom(p.days), group: autoGroup(p.days) });
   }
   function patchView(patch: Partial<View>) {
     setHistory([]);
@@ -121,7 +154,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
 
   const dataGroup: GroupBy = data?.groupBy ?? group;
   const visibleDevices = useMemo(() => (userId ? devices.filter((d) => d.userId === Number(userId)) : devices), [devices, userId]);
-  const unitLabel = dataGroup === "day" ? t.stats.day : dataGroup === "week" ? t.stats.week : t.stats.month;
+  const unitLabel = dataGroup === "day" ? t.stats.unitDay : dataGroup === "week" ? t.stats.unitWeek : t.stats.unitMonth;
 
   const dateKeyFmt = fmt.dateKey;
   const shortDayFmt = fmt.shortDateKey;
@@ -140,21 +173,27 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
     if (!data) return [];
     const g = data.groupBy;
     return data.buckets.map((b) => {
-      const row: Record<string, number | string> = { key: b.key, label: bucketLabel(b.key, g, true), full: bucketLabel(b.key, g), suspect: b.suspect };
+      const row: Record<string, number | string | null> = { key: b.key, label: bucketLabel(b.key, g, true), full: bucketLabel(b.key, g), suspect: b.suspect };
       let sessions = 0;
       let puffs = 0;
       for (const d of series) {
         const ps = b.perSerial[d.serial];
         row[`sessions:${d.serial}`] = ps?.sessions ?? 0;
-        row[`puffs:${d.serial}`] = ps?.puffs ?? 0;
+        row[`pps:${d.serial}`] = ps && ps.sessions ? Math.round((ps.puffs / ps.sessions) * 10) / 10 : null;
         sessions += ps?.sessions ?? 0;
         puffs += ps?.puffs ?? 0;
       }
       row.sessions = sessions;
       row.puffs = puffs;
+      row.pps = sessions ? Math.round((puffs / sessions) * 10) / 10 : null;
       return row;
     });
   }, [data, bucketLabel, series]);
+
+  const avgPerBucket = useMemo(() => {
+    const vals = chartRows.map((r) => Number(r.sessions));
+    return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : 0;
+  }, [chartRows]);
 
   /** Click on a bucket: zoom to it one level finer, or list its records at day level. */
   async function openBucket(b: Bucket) {
@@ -187,6 +226,25 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
   }
 
   const deviceBySerial = useMemo(() => new Map(devices.map((d) => [d.serial, d])), [devices]);
+  const weekdayNames = useMemo(() => {
+    const dfmt = new Intl.DateTimeFormat(fmt.intlLocale, { weekday: "short" });
+    // 2024-01-01 is a Monday.
+    return Array.from({ length: 7 }, (_, i) => dfmt.format(new Date(Date.UTC(2024, 0, 1 + i, 12))));
+  }, [fmt.intlLocale]);
+
+  const deltaText = (cur: number, prev: number | undefined | null): string | null => {
+    if (!data?.previous || prev == null) return null;
+    if (!prev) return t.stats.previousNone;
+    const pct = Math.round(((cur - prev) / prev) * 100);
+    return `${pct > 0 ? "+" : ""}${pct} % ${f(t.stats.vsPrevious, { days: data.totals.daysInRange })}`;
+  };
+
+  const groupOptions: { key: GroupBy; label: string }[] = [
+    { key: "day", label: t.stats.viewDay },
+    { key: "week", label: t.stats.viewWeek },
+    { key: "month", label: t.stats.viewMonth },
+  ];
+  const rangeOptions = [...presets.map((p) => ({ key: p.key, label: p.label })), ...(activePreset === "custom" ? [{ key: "custom", label: t.stats.custom }] : [])];
 
   return (
     <div className="space-y-4">
@@ -201,66 +259,68 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
         </button>
       </div>
 
-      <div className={`${filtersOpen ? "flex" : "hidden"} flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-3 sm:flex sm:border-0 sm:bg-transparent sm:p-0`}>
-        <div className="flex gap-1">
-          {presets.map((p) => (
-            <button key={p.key} type="button" className="ui-btn h-8 px-2.5 text-xs" onClick={() => applyPreset(p.days)}>
-              {p.label}
-            </button>
-          ))}
+      {/* One filter row above everything it scopes: range first, then the view, then who. */}
+      <div className={`${filtersOpen ? "flex" : "hidden"} flex-col gap-3 rounded-xl border border-border bg-surface p-3 sm:flex sm:border-0 sm:bg-transparent sm:p-0`}>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <Segmented label={t.stats.range} value={activePreset} options={rangeOptions} onChange={(k) => k !== "custom" && applyPreset(k)} />
+          <Segmented label={t.stats.view} value={group} options={groupOptions} onChange={(g) => patchView({ group: g })} />
         </div>
-        <label className="text-xs text-text-2">
-          {t.common.from}
-          <input type="date" className="ui-input ml-2 h-8" value={from} max={to} onChange={(e) => patchView({ from: e.target.value })} />
-        </label>
-        <label className="text-xs text-text-2">
-          {t.common.to}
-          <input type="date" className="ui-input ml-2 h-8" value={to} min={from} onChange={(e) => patchView({ to: e.target.value })} />
-        </label>
-        <label className="text-xs text-text-2">
-          {t.stats.groupBy}
-          <select className="ui-input ml-2 h-8" value={group} onChange={(e) => patchView({ group: e.target.value as GroupBy })}>
-            <option value="day">{t.stats.day}</option>
-            <option value="week">{t.stats.week}</option>
-            <option value="month">{t.stats.month}</option>
-          </select>
-        </label>
-        <label className="text-xs text-text-2">
-          {t.stats.user}
-          <select
-            className="ui-input ml-2 h-8"
-            value={userId}
-            onChange={(e) => {
-              setUserId(e.target.value);
-              setSerial("");
-            }}
-          >
-            <option value="">{t.common.all}</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs text-text-2">
-          {t.stats.device}
-          <select className="ui-input ml-2 h-8" value={serial} onChange={(e) => setSerial(e.target.value)}>
-            <option value="">{t.common.all}</option>
-            {visibleDevices.map((d) => (
-              <option key={d.serial} value={d.serial}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex h-8 items-center gap-2 text-xs text-text-2">
-          <input type="checkbox" checked={includeSuspect} onChange={(e) => setIncludeSuspect(e.target.checked)} />
-          {t.stats.includeSuspect}
-        </label>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-xs text-text-2">
+          <label className="inline-flex items-center gap-2">
+            {t.common.from}
+            <input type="date" className="ui-input h-8" value={from} max={to} onChange={(e) => patchView({ from: e.target.value })} />
+          </label>
+          <label className="inline-flex items-center gap-2">
+            {t.common.to}
+            <input type="date" className="ui-input h-8" value={to} min={from} onChange={(e) => patchView({ to: e.target.value })} />
+          </label>
+          {users.length > 1 ? (
+            <div className="inline-flex items-center gap-2">
+              {t.stats.user}
+              <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5">
+                {[{ id: "", name: t.common.all, color: null as string | null }, ...users.map((u) => ({ id: String(u.id), name: u.name, color: u.color as string | null }))].map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => {
+                      setUserId(u.id);
+                      setSerial("");
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm transition-colors ${userId === u.id ? "bg-accent text-accent-ink" : "text-text-2 hover:text-text"}`}
+                  >
+                    {u.color ? <span className="inline-block h-2 w-2 rounded-full" style={{ background: u.color }} aria-hidden /> : null}
+                    {u.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {visibleDevices.length > 1 ? (
+            <div className="inline-flex flex-wrap items-center gap-2">
+              {t.stats.device}
+              <div className="inline-flex flex-wrap rounded-lg border border-border bg-surface-2 p-0.5">
+                {[{ serial: "", name: t.common.all, color: null as string | null }, ...visibleDevices.map((d) => ({ serial: d.serial, name: d.name, color: colorCss(d.color) as string | null }))].map((d) => (
+                  <button
+                    key={d.serial}
+                    type="button"
+                    onClick={() => setSerial(d.serial)}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm transition-colors ${serial === d.serial ? "bg-accent text-accent-ink" : "text-text-2 hover:text-text"}`}
+                  >
+                    {d.color ? <span className="inline-block h-2 w-2 rounded-full" style={{ background: d.color }} aria-hidden /> : null}
+                    {d.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <label className="inline-flex h-8 items-center gap-2">
+            <input type="checkbox" checked={includeSuspect} onChange={(e) => setIncludeSuspect(e.target.checked)} />
+            {t.stats.includeSuspect}
+          </label>
+        </div>
       </div>
 
-      {/* Device chips: one click filters, legend-style toggle hides a series. */}
+      {/* Device legend: one click hides a series, double click filters to it. */}
       {data && data.devices.length > 1 ? (
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="text-muted">{t.stats.perDevice}:</span>
@@ -296,14 +356,22 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
       <div className={`space-y-4 transition-opacity ${loading ? "opacity-60" : ""}`}>
         {data ? (
           <>
+            {/* KPI row: the two numbers that matter for any range come first. */}
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Stat label={t.stats.totalSessions} value={fmt.integer(data.totals.sessions)} hint={`${t.stats.totalRecords}: ${fmt.integer(data.totals.records)}`} />
-              <Stat label={t.stats.totalPuffs} value={fmt.integer(data.totals.puffs)} hint={data.totals.avgPuffsPerSession != null ? `${t.stats.avgPuffsPerStick}: ${fmt.number(data.totals.avgPuffsPerSession)}` : undefined} />
-              <Stat label={t.stats.avgSticksPerDay} value={fmt.number(data.totals.avgSessionsPerDay)} hint={`${fmt.number(data.totals.avgSessionsPerActiveDay)} ${t.stats.avgPerActiveDay}`} />
-              <Stat label={t.stats.avgPuffsPerDay} value={fmt.number(data.totals.avgPuffsPerDay)} hint={`${fmt.number(data.totals.avgPuffsPerActiveDay)} ${t.stats.avgPerActiveDay}`} />
-            </div>
-            <div className="text-xs text-muted">
-              {t.stats.daysInRange}: {data.totals.daysInRange} · {t.stats.daysWithData}: {data.totals.daysWithData} · {t.stats.clickHint}
+              <Kpi
+                label={t.stats.avgSticksPerDay}
+                value={fmt.number(data.totals.avgSessionsPerDay)}
+                delta={deltaText(data.totals.avgSessionsPerDay, data.previous?.avgSessionsPerDay)}
+                hint={f(t.stats.activeDaysHint, { active: fmt.number(data.totals.avgSessionsPerActiveDay), days: data.totals.daysWithData, total: data.totals.daysInRange })}
+              />
+              <Kpi
+                label={t.stats.avgPuffsPerStick}
+                value={data.totals.avgPuffsPerSession == null ? "—" : fmt.number(data.totals.avgPuffsPerSession)}
+                delta={data.totals.avgPuffsPerSession == null ? null : deltaText(data.totals.avgPuffsPerSession, data.previous?.avgPuffsPerSession)}
+                hint={`${t.stats.avgPuffsPerDay}: ${fmt.number(data.totals.avgPuffsPerDay)}`}
+              />
+              <Kpi label={t.stats.totalSessions} value={fmt.integer(data.totals.sessions)} delta={deltaText(data.totals.sessions, data.previous?.sessions)} hint={`${t.stats.totalRecords}: ${fmt.integer(data.totals.records)}`} />
+              <Kpi label={t.stats.totalPuffs} value={fmt.integer(data.totals.puffs)} delta={deltaText(data.totals.puffs, data.previous?.puffs)} />
             </div>
 
             {data.totals.records === 0 ? (
@@ -311,13 +379,43 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
             ) : (
               <>
                 <Card>
-                  <CardTitle>{f(t.stats.chartSticks, { unit: unitLabel.toLowerCase() })}</CardTitle>
-                  <BucketChart rows={chartRows} bars={series.map((d) => ({ key: `sessions:${d.serial}`, name: d.name, color: colorCss(d.color) }))} onBar={(i) => data.buckets[i] && void openBucket(data.buckets[i])} />
+                  <CardTitle right={<span className="hidden text-xs text-muted sm:inline">{t.stats.clickHint}</span>}>{f(t.stats.chartSticks, { unit: unitLabel })}</CardTitle>
+                  <SticksChart
+                    rows={chartRows}
+                    bars={series.map((d) => ({ key: `sessions:${d.serial}`, name: d.name, color: colorCss(d.color) }))}
+                    average={avgPerBucket}
+                    averageLabel={t.stats.averageLine}
+                    onBar={(i) => data.buckets[i] && void openBucket(data.buckets[i])}
+                  />
                 </Card>
                 <Card>
-                  <CardTitle>{f(t.stats.chartPuffs, { unit: unitLabel.toLowerCase() })}</CardTitle>
-                  <BucketChart rows={chartRows} bars={series.map((d) => ({ key: `puffs:${d.serial}`, name: d.name, color: colorCss(d.color) }))} onBar={(i) => data.buckets[i] && void openBucket(data.buckets[i])} />
+                  <CardTitle>{t.stats.avgPuffsPerStick}</CardTitle>
+                  <PuffsPerStickChart
+                    rows={chartRows}
+                    lines={series.map((d) => ({ key: `pps:${d.serial}`, name: d.name, color: colorCss(d.color) }))}
+                    average={data.totals.avgPuffsPerSession}
+                    averageLabel={`${t.stats.averageLine} ${data.totals.avgPuffsPerSession == null ? "" : fmt.number(data.totals.avgPuffsPerSession)}`}
+                    onPoint={(i) => data.buckets[i] && void openBucket(data.buckets[i])}
+                  />
                 </Card>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card>
+                    <CardTitle right={<span className="text-xs text-muted">{t.stats.sticksPerDayShort}</span>}>{t.stats.byHour}</CardTitle>
+                    <DistributionChart
+                      rows={data.byHour.map((n, h) => ({ label: String(h).padStart(2, "0"), full: `${String(h).padStart(2, "0")}:00–${String(h).padStart(2, "0")}:59`, value: Math.round((n / Math.max(1, data.totals.daysInRange)) * 100) / 100, count: n }))}
+                      tickEvery={3}
+                      countLabel={t.stats.sticks}
+                    />
+                  </Card>
+                  <Card>
+                    <CardTitle right={<span className="text-xs text-muted">{t.stats.sticksPerDayShort}</span>}>{t.stats.byWeekday}</CardTitle>
+                    <DistributionChart
+                      rows={data.byWeekday.map((n, i) => ({ label: weekdayNames[i], full: weekdayNames[i], value: Math.round((n / Math.max(1, data.totals.daysInRange / 7)) * 100) / 100, count: n }))}
+                      tickEvery={1}
+                      countLabel={t.stats.sticks}
+                    />
+                  </Card>
+                </div>
 
                 {drill ? (
                   <Card>
@@ -372,9 +470,12 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                   </Card>
                 ) : null}
 
-                <Card>
-                  <CardTitle>{t.stats.period}</CardTitle>
-                  <div className="overflow-x-auto">
+                <details className="ui-card group p-4 sm:p-5">
+                  <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold uppercase tracking-wide text-text-2">
+                    {t.stats.tableByPeriod}
+                    <ChevronDown size={16} className="transition-transform group-open:rotate-180" aria-hidden />
+                  </summary>
+                  <div className="mt-3 overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="text-left text-xs text-text-2">
                         <tr>
@@ -383,7 +484,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.sessions}</th>
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.puffs}</th>
                           <th className="py-1.5 pr-3 text-right font-medium">{t.stats.avgSticksPerDay}</th>
-                          <th className="py-1.5 text-right font-medium">{t.stats.avgPuffsPerDay}</th>
+                          <th className="py-1.5 text-right font-medium">{t.stats.avgPuffsPerStick}</th>
                         </tr>
                       </thead>
                       <tbody className="tabular">
@@ -397,13 +498,13 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
                             <td className="py-1.5 pr-3 text-right">{fmt.integer(b.sessions)}</td>
                             <td className="py-1.5 pr-3 text-right">{fmt.integer(b.puffs)}</td>
                             <td className="py-1.5 pr-3 text-right">{fmt.number(Math.round((b.sessions / b.days) * 100) / 100)}</td>
-                            <td className="py-1.5 text-right">{fmt.number(Math.round((b.puffs / b.days) * 100) / 100)}</td>
+                            <td className="py-1.5 text-right">{b.sessions ? fmt.number(Math.round((b.puffs / b.sessions) * 10) / 10) : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </Card>
+                </details>
               </>
             )}
             <p className="text-xs text-muted">{t.stats.recordsNote}</p>
@@ -416,27 +517,45 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
   );
 }
 
-type ChartRow = Record<string, number | string>;
+/** Stat tile with an optional delta against the previous period. */
+function Kpi({ label, value, delta, hint }: { label: string; value: string; delta?: string | null; hint?: string }) {
+  return (
+    <div className="ui-card px-4 py-3">
+      <div className="text-xs text-text-2">{label}</div>
+      <div className="mt-1 text-2xl font-semibold">{value}</div>
+      {delta ? <div className="mt-0.5 text-xs text-text-2">{delta}</div> : null}
+      {hint ? <div className="mt-0.5 text-xs text-muted">{hint}</div> : null}
+    </div>
+  );
+}
+
+type ChartRow = Record<string, number | string | null>;
 interface SeriesDef {
   key: string;
   name: string;
   color: string;
 }
 
-/** Stacked bars per device; measures its own width to pick the tick density. */
-const BucketChart = memo(function BucketChart({ rows, bars, onBar }: { rows: ChartRow[]; bars: SeriesDef[]; onBar: (index: number) => void }) {
-  const fmt = useFormat();
-  const ref = useRef<HTMLDivElement>(null);
+function useTickInterval(ref: React.RefObject<HTMLDivElement | null>, count: number): number {
   const width = useElementWidth(ref);
   const maxTicks = Math.max(3, Math.floor((width || 600) / 72));
-  const interval = rows.length > maxTicks ? Math.ceil(rows.length / maxTicks) - 1 : 0;
+  return count > maxTicks ? Math.ceil(count / maxTicks) - 1 : 0;
+}
+
+/** Stacked columns per device with the per-bucket average and the peak labelled. */
+const SticksChart = memo(function SticksChart({ rows, bars, average, averageLabel, onBar }: { rows: ChartRow[]; bars: SeriesDef[]; average: number; averageLabel: string; onBar: (index: number) => void }) {
+  const fmt = useFormat();
+  const ref = useRef<HTMLDivElement>(null);
+  const interval = useTickInterval(ref, rows.length);
+  const peak = rows.reduce((best, r, i) => (Number(r.sessions) > Number(rows[best]?.sessions ?? -1) ? i : best), 0);
+  const last = bars[bars.length - 1];
   return (
-    <div ref={ref} className="h-52 w-full sm:h-64">
+    <div ref={ref} className="h-56 w-full sm:h-72">
       <ResponsiveContainer>
-        <BarChart
+        <ComposedChart
           data={rows}
-          margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-          barCategoryGap="25%"
+          margin={{ top: 16, right: 72, left: 0, bottom: 0 }}
+          barCategoryGap="30%"
           onClick={(state) => {
             const idx = (state as { activeTooltipIndex?: number } | null)?.activeTooltipIndex;
             if (typeof idx === "number") onBar(idx);
@@ -444,20 +563,127 @@ const BucketChart = memo(function BucketChart({ rows, bars, onBar }: { rows: Cha
           style={{ cursor: "pointer" }}
         >
           <CartesianGrid vertical={false} stroke="var(--grid)" />
-          <XAxis dataKey="label" tick={{ fontSize: 11, fill: "var(--text-2)" }} tickLine={false} axisLine={{ stroke: "var(--border)" }} interval={interval} minTickGap={16} />
-          <YAxis tick={{ fontSize: 11, fill: "var(--text-2)" }} tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+          <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: "var(--border)" }} interval={interval} minTickGap={16} />
+          <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={32} allowDecimals={false} />
           <Tooltip
             cursor={{ fill: "var(--surface-2)" }}
-            contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--text)" }}
+            contentStyle={TOOLTIP_STYLE}
             labelStyle={{ color: "var(--text-2)" }}
             itemStyle={{ color: "var(--text)" }}
             labelFormatter={(_label, payload) => String(payload?.[0]?.payload?.full ?? _label)}
             formatter={(value, name) => [fmt.integer(Number(value)), String(name)]}
           />
           {bars.map((s, i) => (
-            <Bar key={s.key} dataKey={s.key} name={s.name} stackId="a" fill={s.color} stroke="var(--surface)" strokeWidth={1} radius={i === bars.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false} />
+            <Bar key={s.key} dataKey={s.key} name={s.name} stackId="a" fill={s.color} stroke="var(--surface)" strokeWidth={2} maxBarSize={24} radius={i === bars.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false}>
+              {s.key === last?.key ? (
+                <LabelList
+                  dataKey="sessions"
+                  position="top"
+                  content={(props) => {
+                    const { x, y, width, index, value } = props as { x?: number; y?: number; width?: number; index?: number; value?: number | string };
+                    if (index !== peak || x == null || y == null || width == null || !value) return null;
+                    return (
+                      <text x={x + width / 2} y={y - 6} textAnchor="middle" fontSize={11} fontWeight={600} fill="var(--text)">
+                        {fmt.integer(Number(value))}
+                      </text>
+                    );
+                  }}
+                />
+              ) : null}
+            </Bar>
           ))}
-        </BarChart>
+          {average > 0 ? <ReferenceLine y={average} stroke="var(--text-2)" strokeWidth={1} ifOverflow="extendDomain" label={{ value: `${averageLabel} ${fmt.number(average)}`, position: "right", fill: "var(--text-2)", fontSize: 11 }} /> : null}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
+/** Puffs per stick is a rate: lines with ringed markers, the overall average as a reference. */
+const PuffsPerStickChart = memo(function PuffsPerStickChart({ rows, lines, average, averageLabel, onPoint }: { rows: ChartRow[]; lines: SeriesDef[]; average: number | null; averageLabel: string; onPoint: (index: number) => void }) {
+  const fmt = useFormat();
+  const ref = useRef<HTMLDivElement>(null);
+  const interval = useTickInterval(ref, rows.length);
+  const many = rows.length > 40;
+  return (
+    <div ref={ref} className="h-52 w-full sm:h-64">
+      <ResponsiveContainer>
+        <ComposedChart
+          data={rows}
+          margin={{ top: 12, right: 72, left: 0, bottom: 0 }}
+          onClick={(state) => {
+            const idx = (state as { activeTooltipIndex?: number } | null)?.activeTooltipIndex;
+            if (typeof idx === "number") onPoint(idx);
+          }}
+          style={{ cursor: "pointer" }}
+        >
+          <CartesianGrid vertical={false} stroke="var(--grid)" />
+          <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: "var(--border)" }} interval={interval} minTickGap={16} />
+          <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={32} domain={[0, "auto"]} />
+          <Tooltip
+            cursor={{ stroke: "var(--border)" }}
+            contentStyle={TOOLTIP_STYLE}
+            labelStyle={{ color: "var(--text-2)" }}
+            itemStyle={{ color: "var(--text)" }}
+            labelFormatter={(_label, payload) => String(payload?.[0]?.payload?.full ?? _label)}
+            formatter={(value, name) => [value == null ? "—" : fmt.number(Number(value)), String(name)]}
+          />
+          {lines.map((s) => (
+            <Line
+              key={s.key}
+              type="monotone"
+              dataKey={s.key}
+              name={s.name}
+              stroke={s.color}
+              strokeWidth={2}
+              connectNulls
+              dot={many ? false : { r: 4, fill: s.color, stroke: "var(--surface)", strokeWidth: 2 }}
+              activeDot={{ r: 6, fill: s.color, stroke: "var(--surface)", strokeWidth: 2 }}
+              isAnimationActive={false}
+            />
+          ))}
+          {average != null ? <ReferenceLine y={average} stroke="var(--accent)" strokeWidth={1} label={{ value: averageLabel, position: "right", fill: "var(--text-2)", fontSize: 11 }} /> : null}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
+/** Single-hue columns for a distribution (hour of day, weekday). */
+const DistributionChart = memo(function DistributionChart({ rows, tickEvery, countLabel }: { rows: { label: string; full: string; value: number; count: number }[]; tickEvery: number; countLabel: string }) {
+  const fmt = useFormat();
+  const peak = rows.reduce((best, r, i) => (r.value > (rows[best]?.value ?? -1) ? i : best), 0);
+  return (
+    <div className="h-44 w-full sm:h-52">
+      <ResponsiveContainer>
+        <ComposedChart data={rows} margin={{ top: 16, right: 8, left: 0, bottom: 0 }} barCategoryGap="25%">
+          <CartesianGrid vertical={false} stroke="var(--grid)" />
+          <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: "var(--border)" }} interval={tickEvery - 1} />
+          <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={32} />
+          <Tooltip
+            cursor={{ fill: "var(--surface-2)" }}
+            contentStyle={TOOLTIP_STYLE}
+            labelStyle={{ color: "var(--text-2)" }}
+            itemStyle={{ color: "var(--text)" }}
+            labelFormatter={(_label, payload) => String(payload?.[0]?.payload?.full ?? _label)}
+            formatter={(value, _name, item) => [`${fmt.number(Number(value))} · ${fmt.integer(Number((item as { payload?: { count?: number } }).payload?.count ?? 0))} ${countLabel.toLowerCase()}`, ""]}
+          />
+          <Bar dataKey="value" fill="var(--accent)" stroke="var(--surface)" strokeWidth={2} maxBarSize={24} radius={[4, 4, 0, 0]} isAnimationActive={false}>
+            <LabelList
+              dataKey="value"
+              position="top"
+              content={(props) => {
+                const { x, y, width, index, value } = props as { x?: number; y?: number; width?: number; index?: number; value?: number | string };
+                if (index !== peak || x == null || y == null || width == null || !value) return null;
+                return (
+                  <text x={x + width / 2} y={y - 6} textAnchor="middle" fontSize={11} fontWeight={600} fill="var(--text)">
+                    {fmt.number(Number(value))}
+                  </text>
+                );
+              }}
+            />
+          </Bar>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

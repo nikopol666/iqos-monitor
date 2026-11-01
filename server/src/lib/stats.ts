@@ -1,4 +1,4 @@
-import { addDays, daysBetweenInclusive, isoWeekKey, isoWeekStart, localDateKey, monthKey, DISPLAY_TZ } from "./time";
+import { addDays, daysBetweenInclusive, isoWeekKey, isoWeekStart, localParts, monthKey, DISPLAY_TZ } from "./time";
 
 export type GroupBy = "day" | "week" | "month";
 
@@ -46,6 +46,10 @@ export interface StatsResult {
   tz: string;
   buckets: Bucket[];
   totals: StatTotals;
+  /** Sessions (records with puffs) by local hour of day, 0–23. */
+  byHour: number[];
+  /** Sessions by local weekday, Monday first. */
+  byWeekday: number[];
 }
 
 function bucketKeyFor(dateKey: string, groupBy: GroupBy): string {
@@ -79,13 +83,21 @@ export function computeStats(rows: StatRow[], from: string, to: string, groupBy:
     b.days++;
   }
   const activeDays = new Set<string>();
+  const byHour = new Array<number>(24).fill(0);
+  const byWeekday = new Array<number>(7).fill(0);
   let records = 0;
   let sessions = 0;
   let puffs = 0;
   let suspect = 0;
   for (const row of rows) {
-    const day = localDateKey(new Date(row.timestampUtc), tz);
+    const when = new Date(row.timestampUtc);
+    const parts = localParts(when, tz);
+    const day = `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
     if (day < from || day > to) continue;
+    if ((row.puffCount ?? 0) > 0) {
+      byHour[parts.hour]++;
+      byWeekday[(new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay() + 6) % 7]++;
+    }
     const b = buckets.get(bucketKeyFor(day, groupBy));
     if (!b) continue;
     activeDays.add(day);
@@ -125,5 +137,5 @@ export function computeStats(rows: StatRow[], from: string, to: string, groupBy:
     avgPuffsPerActiveDay: daysWithData ? round2(puffs / daysWithData) : 0,
     avgPuffsPerSession: sessions ? round2(puffs / sessions) : null,
   };
-  return { groupBy, from, to, tz, buckets: [...buckets.values()], totals };
+  return { groupBy, from, to, tz, buckets: [...buckets.values()], totals, byHour, byWeekday };
 }

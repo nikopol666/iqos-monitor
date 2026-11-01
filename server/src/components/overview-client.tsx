@@ -146,11 +146,19 @@ const DeviceCard = memo(function DeviceCard({ d, eta }: { d: DeviceOverview; eta
   const perStick = d.today.sessions ? fmt.number(Math.round((d.today.puffs / d.today.sessions) * 10) / 10) : "—";
   const tiles = (
     <>
-      <Metric
-        label={d.connected && d.charging != null ? (d.charging ? t.overview.charging : t.overview.charged) : t.overview.battery}
-        value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
-        icon={d.connected && d.charging ? <BatteryCharging size={16} aria-hidden className="anim-bolt text-good" /> : <BatteryMedium size={16} aria-hidden className={d.connected ? "text-good" : "text-muted"} />}
-      />
+      {d.connected ? (
+        <Metric
+          label={d.charging != null ? (d.charging ? t.overview.charging : t.overview.charged) : t.overview.battery}
+          value={d.lifetime.battery == null ? "—" : `${d.lifetime.battery} %`}
+          icon={d.charging ? <BatteryCharging size={16} aria-hidden className="anim-bolt text-good" /> : <BatteryMedium size={16} aria-hidden className="text-good" />}
+        />
+      ) : (
+        <Metric
+          label={t.overview.lastSeenLabel}
+          value={<span className="text-sm font-medium">{d.live?.disconnectedUtc ? fmt.dateTime(d.live.disconnectedUtc) : d.lastSeenUtc ? fmt.dateTime(d.lastSeenUtc) : "—"}</span>}
+          icon={<Cable size={16} aria-hidden className="text-muted" />}
+        />
+      )}
       <Metric label={t.overview.sticksToday} value={fmt.integer(d.today.sessions)} />
       <Metric label={t.overview.puffsToday} value={fmt.integer(d.today.puffs)} />
       <Metric label={t.overview.puffsPerStickToday} value={perStick} />
@@ -202,9 +210,11 @@ const DeviceCard = memo(function DeviceCard({ d, eta }: { d: DeviceOverview; eta
           {t.overview.lifetime}: {f(t.overview.todaySticks, { n: fmt.integer(d.lifetime.sticks) })} · {f(t.overview.todayPuffs, { n: fmt.integer(d.lifetime.puffs) })}
           {d.lifetime.seconds != null ? ` · ${fmt.number(Math.round((d.lifetime.seconds / 3600) * 10) / 10)} h` : ""}
         </span>
-        <span>
-          {t.overview.brightness}: {brightness}
-        </span>
+        {d.connected ? (
+          <span>
+            {t.overview.brightness}: {brightness}
+          </span>
+        ) : null}
         {!d.connected ? (
           <span className="text-muted">
             {d.live?.disconnectedUtc ? f(t.overview.offlineSince, { time: fmt.dateTime(d.live.disconnectedUtc) }) : d.lastSeenUtc ? f(t.overview.lastSeen, { time: fmt.dateTime(d.lastSeenUtc) }) : t.overview.neverConnected}

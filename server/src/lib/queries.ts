@@ -2,8 +2,8 @@
 import { and, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { getDb, getSqlite, schema } from "@/db";
 import { isLiveConnected, openFullHistoryJob } from "@/lib/ingest";
-import { computeStats, type GroupBy, type StatRow, type StatsResult } from "@/lib/stats";
-import { localDayRangeUtc, todayKey, DISPLAY_TZ } from "@/lib/time";
+import { computeStats, type GroupBy, type StatRow, type StatsResult, type StatTotals } from "@/lib/stats";
+import { localDayRangeUtc, todayKey, DISPLAY_TZ, addDays, daysBetweenInclusive } from "@/lib/time";
 import { deviceLabel } from "@/lib/variants";
 
 export interface DeviceOverview {
@@ -105,16 +105,28 @@ export function deviceOverview(device: schema.Device, siblings: schema.Device[] 
     lifetime: {
       sticks: connected && live?.lifetimeSticks != null ? live.lifetimeSticks : (num(values.lifetime_sticks_candidate) ?? live?.lifetimeSticks ?? null),
       puffs: connected && live?.lifetimePuffs != null ? live.lifetimePuffs : (num(values.lifetime_puffs_candidate) ?? live?.lifetimePuffs ?? null),
-      seconds: connected && live?.lifetimeSeconds != null ? live.lifetimeSeconds : (num(values.lifetime_seconds_candidate) ?? live?.lifetimeSeconds ?? null),
-      battery: connected ? (live?.battery ?? null) : (live?.battery ?? num(values.battery_percent) ?? null),
+      seconds: usageSeconds(connected && live?.lifetimeSeconds != null ? live.lifetimeSeconds : (num(values.lifetime_seconds_candidate) ?? live?.lifetimeSeconds ?? null)),
+      // Battery, charging and brightness can change while the device is away: shown only while connected.
+      battery: connected ? (live?.battery ?? null) : null,
     },
-    charging: extra.charging ?? (typeof values.charging === "boolean" ? values.charging : null),
-    brightness: extra.brightness_level ?? (typeof values.brightness_level === "number" ? values.brightness_level : null),
+    charging: connected ? (extra.charging ?? null) : null,
+    brightness: connected ? (extra.brightness_level ?? null) : null,
     clockWarning: !!device.clockWarning,
     fullHistoryComplete: !!device.fullHistoryComplete,
     ackedNextIndex: device.ackedNextIndex,
     lowestStoredIndex: device.lowestStoredIndex,
   };
+}
+
+/**
+ * The device's usage counter ticks about 2.5 times per second of a session
+ * (two timed sessions: 648 ticks / 256 s and 820 ticks / 335 s), not 4 as
+ * iqos-bar assumes. The agent reports ticks / 4; undo that and apply the
+ * measured rate. See PROTOCOL.md, "Korelace kandidátů".
+ */
+export const USAGE_TICKS_PER_SECOND = 2.5;
+export function usageSeconds(agentSeconds: number | null): number | null {
+  return agentSeconds == null ? null : Math.round((agentSeconds * 4) / USAGE_TICKS_PER_SECOND);
 }
 
 export function overview(): DeviceOverview[] {
@@ -135,9 +147,18 @@ function isoNoMs(d: Date): string {
   return d.toISOString().replace(/\.\d{3}Z$/, "+00:00");
 }
 
-export function statsFor(q: StatsQuery): StatsResult & { suspectHidden: number } {
+/** Totals of the period of equal length right before [from, to] (for deltas on the stats page). */
+function previousTotals(q: StatsQuery): StatTotals {
+  const days = daysBetweenInclusive(q.from, q.to);
+  const to = addDays(q.from, -1);
+  const from = addDays(to, -(days - 1));
+  return statsFor({ ...q, from, to, groupBy: "day" }, false).totals;
+}
+
+export function statsFor(q: StatsQuery, withPrevious = true): StatsResult & { suspectHidden: number; previous: StatTotals | null } {
   const db = getDb();
-  if (!q.serials.length) return { ...computeStats([], q.from, q.to, q.groupBy, DISPLAY_TZ), suspectHidden: 0 };
+  const previous = withPrevious ? previousTotals(q) : null;
+  if (!q.serials.length) return { ...computeStats([], q.from, q.to, q.groupBy, DISPLAY_TZ), suspectHidden: 0, previous };
   const { startUtc, endUtcExclusive } = localDayRangeUtc(q.from, q.to);
   const rows = db
     .select({
@@ -170,7 +191,7 @@ export function statsFor(q: StatsQuery): StatsResult & { suspectHidden: number }
         .get(...q.serials, isoNoMs(startUtc), isoNoMs(endUtcExclusive)) as { n: number }
     ).n;
   }
-  return { ...computeStats(rows, q.from, q.to, q.groupBy, DISPLAY_TZ), suspectHidden };
+  return { ...computeStats(rows, q.from, q.to, q.groupBy, DISPLAY_TZ), suspectHidden, previous };
 }
 
 export interface DayRecord {

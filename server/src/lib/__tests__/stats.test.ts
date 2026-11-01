@@ -34,6 +34,10 @@ describe("computeStats", () => {
   ];
   it("groups by day with empty buckets and averages per calendar/active day", () => {
     const r = computeStats(rows, "2026-10-25", "2026-10-28", "day", "Europe/Prague");
+    expect(r.byHour).toHaveLength(24);
+    expect(r.byWeekday).toHaveLength(7);
+    expect(r.byHour.reduce((a, b) => a + b, 0)).toBe(r.totals.sessions);
+    expect(r.byWeekday.reduce((a, b) => a + b, 0)).toBe(r.totals.sessions);
     expect(r.buckets.map((b) => b.key)).toEqual(["2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28"]);
     expect(r.buckets[1]).toMatchObject({ records: 2, sessions: 1, puffs: 18 });
     expect(r.buckets[2]).toMatchObject({ records: 1, sessions: 1, puffs: 14, suspect: 1 });
