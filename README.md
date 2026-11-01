@@ -116,7 +116,7 @@ To build the image on the host instead of pulling it:
 
 ## Install the agent (Windows)
 
-1. Download `IQOS-Agent.exe` from the latest [release](https://github.com/nikopol666/iqos/releases)
+1. Download `IQOS-Agent.exe` from the latest [release](https://github.com/nikopol666/iqos-monitor/releases)
    and run it. A tray icon appears and the settings window opens on first start.
 2. Enter the server address (`http://<host>:3000` or your HTTPS name) and an
    API key from *Settings → Agents* on the web (or the fixed `AGENT_API_KEY`),

@@ -27,7 +27,7 @@ from iqos_agent import __version__
 
 log = logging.getLogger(__name__)
 
-REPO = "nikopol666/iqos"
+REPO = "nikopol666/iqos-monitor"
 API_LATEST = f"https://api.github.com/repos/{REPO}/releases/latest"
 ASSET_NAME = "IQOS-Agent.exe"
 CHECK_INTERVAL = 24 * 3600
