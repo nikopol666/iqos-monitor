@@ -133,8 +133,8 @@ byte and 7 data bytes; index 0 is the newest. Type `02` is written on a
 
 ## Sources
 
-- [iqos-bar](https://github.com/pavelkrejci/iqos-bar) and
-  [iqos-scope](https://github.com/pavelkrejci/iqos-scope): the classic read
+- [iqos-bar](https://github.com/tiritfurkan/iqos-bar) and
+  [iqos-scope](https://github.com/SabriEzzine/iqos-scope): the classic read
   registers and the first interpretation of the counters.
 - [okhsunrog/iqos](https://github.com/okhsunrog/iqos) (`agent/usb-transport`
   branch), [hauntedfail/iqos](https://github.com/hauntedfail/iqos),

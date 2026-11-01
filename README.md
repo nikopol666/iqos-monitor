@@ -179,8 +179,8 @@ event log read-only).
 
 ## Credits
 
-The register map started from [iqos-bar](https://github.com/pavelkrejci/iqos-bar)
-and [iqos-scope](https://github.com/pavelkrejci/iqos-scope); the shared
+The register map started from [iqos-bar](https://github.com/tiritfurkan/iqos-bar)
+and [iqos-scope](https://github.com/SabriEzzine/iqos-scope); the shared
 BLE/USB framing and the settings command set were confirmed with
 [okhsunrog/iqos](https://github.com/okhsunrog/iqos),
 [hauntedfail/iqos](https://github.com/hauntedfail/iqos) and
