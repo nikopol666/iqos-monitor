@@ -23,6 +23,7 @@ class Config:
     api_key: str = ""
     agent_name: str = field(default_factory=lambda: socket.gethostname() or "agent")
     language: str = "auto"          # auto | en | cs
+    auto_update: bool = True        # replace the exe from GitHub releases once a day
     live_interval: float = 1.0      # seconds between live reads while connected
     recent_months: int = 3          # first sync window for a new device
     read_delay: float = 0.10        # minimum pause between archive reads

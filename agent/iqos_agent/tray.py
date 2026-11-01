@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import threading
 import tkinter as tk
+from tkinter import messagebox
 import webbrowser
 
 import pystray
@@ -13,7 +14,9 @@ from iqos_agent import autostart
 from iqos_agent.config import Config, load_config
 from iqos_agent.i18n import Translator
 from iqos_agent.settings_ui import open_settings
+from iqos_agent.updater import UpdateScheduler, check_and_apply, cleanup_after_update
 from iqos_agent.worker import AgentManager, AgentStatus
+from iqos_agent import __version__
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +52,7 @@ class TrayApp:
         self.icon = pystray.Icon("iqos-agent", make_icon(COLORS["idle"]), self.tr("app"), menu=self._menu())
         self._settings_win = None
         self._refresh_pending = False
+        self.updater = UpdateScheduler(enabled=lambda: self.cfg.auto_update, on_staged=self._restart_for_update)
 
     # -- menu ---------------------------------------------------------------------------
     def _menu(self) -> pystray.Menu:
@@ -59,6 +63,7 @@ class TrayApp:
             pystray.MenuItem(self.tr("menu_open_web"), self._open_web, enabled=lambda item: self.cfg.configured),
             pystray.MenuItem(self.tr("menu_settings"), self._settings),
             pystray.MenuItem(self.tr("menu_autostart"), self._toggle_autostart, checked=lambda item: autostart.is_enabled()),
+            pystray.MenuItem(self.tr("menu_check_updates"), self._check_updates),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(self.tr("menu_quit"), self._quit),
         )
@@ -111,6 +116,27 @@ class TrayApp:
     def _toggle_autostart(self, icon=None, item=None):
         autostart.set_enabled(not autostart.is_enabled())
 
+    def _check_updates(self, icon=None, item=None):
+        def work():
+            result = check_and_apply(force=True)
+            if result == "staged":
+                self.root.after(0, self._restart_for_update)
+                return
+            if result == "source":
+                msg = self.tr("update_source")
+            elif result == "up_to_date":
+                msg = self.tr("update_up_to_date", version=__version__)
+            else:
+                msg = self.tr("update_error", error=result.removeprefix("error: "))
+            self.root.after(0, lambda: messagebox.showinfo(self.tr("app"), msg))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _restart_for_update(self):
+        """The new build is staged and a helper waits for us to exit."""
+        log.info("restarting for update")
+        self._quit()
+
     def _quit(self, icon=None, item=None):
         self.manager.stop()
         self.icon.stop()
@@ -138,7 +164,9 @@ class TrayApp:
 
     # -- lifecycle ----------------------------------------------------------------------
     def run(self):
+        cleanup_after_update()
         self.manager.start()
+        self.updater.start()
         self.icon.run_detached()
         if not self.cfg.configured:
             self.root.after(300, self._open_settings_window)

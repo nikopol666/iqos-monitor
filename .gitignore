@@ -28,4 +28,5 @@ IQOS-History/
 server/AGENTS.md
 test-vectors/
 agent/dist*/
+agent/iqos_agent/_version.py
 agent/build/

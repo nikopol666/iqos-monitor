@@ -117,8 +117,13 @@ opens the same drill-down as the chart.
 The tray icon is grey without a device, green with a device connected, blue
 during a transfer and red when the server is unreachable. Its menu shows the
 devices with battery and transfer state, opens the web app, opens *Settings*
-(server address, API key, agent name, language) and toggles *Start with
-Windows*. The first start opens the settings window with a *Test* button.
+(server address, API key, agent name, language, automatic updates), checks
+for updates on demand and toggles *Start with Windows*. The first start opens
+the settings window with a *Test* button.
+
+With automatic updates on, the agent checks the latest GitHub release once a
+day and installs it by itself: download, size and digest check, file swap,
+restart. The tray menu's *Check for updates…* does the same immediately.
 
 The agent accepts any IQOS over USB. On connect it takes a diagnostics
 snapshot, reads the archive records the server lacks (the last three months

@@ -27,6 +27,7 @@ def open_settings(root: tk.Tk, cfg: Config, tr: Translator, on_saved: Callable[[
     lang_labels = [tr("lang_auto")] + [LANGUAGE_NAMES[c] for c in LANGUAGE_NAMES]
     lang_var = tk.StringVar(value=lang_labels[lang_codes.index(cfg.language if cfg.language in lang_codes else "auto")])
     auto_var = tk.BooleanVar(value=autostart.is_enabled())
+    upd_var = tk.BooleanVar(value=cfg.auto_update)
     result_var = tk.StringVar(value="")
 
     def row(label: str, widget, r: int):
@@ -38,10 +39,11 @@ def open_settings(root: tk.Tk, cfg: Config, tr: Translator, on_saved: Callable[[
     row(tr("agent_name"), ttk.Entry(frame, textvariable=name_var, width=52), 4)
     row(tr("language"), ttk.Combobox(frame, textvariable=lang_var, values=lang_labels, state="readonly"), 6)
     ttk.Checkbutton(frame, text=tr("autostart"), variable=auto_var).grid(row=8, column=0, columnspan=2, sticky="w", pady=(8, 0))
-    ttk.Label(frame, textvariable=result_var, wraplength=380).grid(row=9, column=0, columnspan=2, sticky="w", pady=(8, 0))
+    ttk.Checkbutton(frame, text=tr("auto_update"), variable=upd_var).grid(row=9, column=0, columnspan=2, sticky="w", pady=(2, 0))
+    ttk.Label(frame, textvariable=result_var, wraplength=380).grid(row=10, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
     buttons = ttk.Frame(frame)
-    buttons.grid(row=10, column=0, columnspan=2, sticky="e", pady=(12, 0))
+    buttons.grid(row=11, column=0, columnspan=2, sticky="e", pady=(12, 0))
 
     def current() -> Config:
         new = Config(**vars(cfg))
@@ -49,6 +51,7 @@ def open_settings(root: tk.Tk, cfg: Config, tr: Translator, on_saved: Callable[[
         new.api_key = key_var.get().strip()
         new.agent_name = name_var.get().strip() or cfg.agent_name
         new.language = lang_codes[lang_labels.index(lang_var.get())] if lang_var.get() in lang_labels else "auto"
+        new.auto_update = bool(upd_var.get())
         return new
 
     def test():

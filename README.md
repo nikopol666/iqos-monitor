@@ -130,6 +130,12 @@ Settings are kept in `%APPDATA%\IQOS Agent\config.json`, the log in
 `%APPDATA%\IQOS Agent\agent.log`. The agent speaks English or Czech following
 Windows, overridable in its settings.
 
+The agent **updates itself**: once a day (and shortly after start) it checks
+the latest GitHub release and, when it is newer, downloads `IQOS-Agent.exe`,
+verifies the size and SHA-256 digest GitHub publishes, swaps the file and
+restarts. Switch it off in the agent's settings if you prefer manual updates;
+*Check for updates…* in the tray menu runs the check at any time.
+
 **Windows 11 Smart App Control** may refuse to run the unsigned executable
 after a download. In that case run the agent from source: install Python 3,
 `pip install -r agent/requirements.txt`, and double-click
