@@ -123,13 +123,26 @@ describe("ingestEvents", () => {
     expect(JSON.parse(last.extra_json).lifetime_seconds).toBe(102);
   });
 
-  it("deleted ids come back only with a full history download, blocked ones never", () => {
+  it("deleted ids come back only with a full history download, blocked ones never", async () => {
     const s = "BLOCK000000001";
     ingest.ensureDevice(s);
+    // A CRC-valid 13-byte reply: the device's "empty slot" frame.
+    const { crc16 } = await import("../protocol/crc");
+    const { bytesToHex } = await import("../protocol/bytes");
+    const empty = (id: number) => {
+      const f = new Uint8Array(13);
+      f[2] = 0x10;
+      f[3] = 13 - 6;
+      f[8] = id & 0xff;
+      const c = crc16(f.subarray(2, 11));
+      f[11] = c & 0xff;
+      f[12] = c >> 8;
+      return bytesToHex(f);
+    };
     ingest.ingestEvents(s, [
-      { event_id: 5, status: "ok", response_hex: "" },
-      { event_id: 6, status: "ok", response_hex: "" },
-      { event_id: 7, status: "ok", response_hex: "" },
+      { event_id: 5, status: "ok", response_hex: empty(5) },
+      { event_id: 6, status: "ok", response_hex: empty(6) },
+      { event_id: 7, status: "ok", response_hex: empty(7) },
     ]);
     ingest.removeRecord(s, 5, "deleted");
     ingest.removeRecord(s, 6, "blocked");
@@ -137,8 +150,8 @@ describe("ingestEvents", () => {
     expect(ingest.missingIds(s, 5, 7, true)).toEqual([5]);
     // a blocked id is acknowledged but not stored; a deleted id is stored again and unblocked
     const r = ingest.ingestEvents(s, [
-      { event_id: 5, status: "ok", response_hex: "" },
-      { event_id: 6, status: "ok", response_hex: "" },
+      { event_id: 5, status: "ok", response_hex: empty(5) },
+      { event_id: 6, status: "ok", response_hex: empty(6) },
     ]);
     expect(r.acked).toEqual([5, 6]);
     expect(ingest.listBlocks(s).map((b) => b.eventId)).toEqual([6]);

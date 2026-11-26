@@ -73,7 +73,7 @@ export function DeviceClient({ initial, snapshot, firstPage, totalAll, samples, 
   async function cancelJob() {
     setBusy(true);
     try {
-      await fetch(`/api/devices/${d.serial}/jobs`, { method: "DELETE" });
+      await fetch(`/api/devices/${d.serial}/jobs`, { method: "DELETE", headers: { "content-type": "application/json" } });
     } finally {
       setBusy(false);
     }

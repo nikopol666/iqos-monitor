@@ -179,7 +179,9 @@ default and the page warns when a colour reads badly in one of the themes.
 
 Generate API keys for agents (shown once), see when each agent last reported,
 from which PC and with which version. A fixed `AGENT_API_KEY` in the
-container environment is accepted as well.
+container environment is accepted as well. Without it, while this list is
+empty, the first agent's key is accepted and stored on its own; see the
+README (`AGENT_AUTO_REGISTER`) for turning that off.
 
 ### Display and language
 

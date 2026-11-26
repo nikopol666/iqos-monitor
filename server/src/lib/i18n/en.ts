@@ -309,7 +309,7 @@ export const en = {
     puffsPerStick: "Puffs per stick",
   },
   units: { percent: "%", hours: "h" },
-  status: { ok: "ok", empty: "empty", timeout: "timeout", bad_crc: "CRC error", device_error: "device error" },
+  status: { ok: "ok", empty: "empty", timeout: "timeout", bad_frame: "invalid frame", bad_crc: "CRC error", device_error: "device error" },
 };
 
 export type Dictionary = typeof en;

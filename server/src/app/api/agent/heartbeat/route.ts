@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   touchAgent(identity, request);
   const body = await readJson<HeartbeatBody>(request);
   if (!body) return badRequest("invalid json");
-  const devicesIn = Array.isArray(body.devices) ? body.devices : [];
+  const devicesIn = (Array.isArray(body.devices) ? body.devices : []).filter((d) => typeof d === "object" && d !== null);
   const serials: string[] = [];
   for (const d of devicesIn) {
     if (!validSerial(d.serial)) continue;

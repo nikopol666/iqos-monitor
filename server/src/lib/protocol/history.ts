@@ -124,7 +124,9 @@ export function decodeEvent(status: string, responseHex: string | null | undefin
   if (frame && frame.length && checkCrc(frame)) {
     if (normalised === "ok" && frame.length === 13) normalised = "empty";
   } else if (normalised === "ok" || normalised === "empty") {
-    normalised = frame && frame.length ? "bad_crc" : status;
+    // ok/empty must come with a frame (missing or not hex = bad_frame): stored
+    // as ok/empty the row would count as final and never be read again.
+    normalised = frame && frame.length ? "bad_crc" : "bad_frame";
   }
   if (normalised !== "ok" || !frame) {
     return { status: normalised, timestampUtc: null, puffCount: null, puffPairs: null, recordMarker: null };

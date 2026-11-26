@@ -44,6 +44,37 @@ export interface IncomingEvent {
   fetched_at_utc?: string | null;
 }
 
+/** Optional string field: absent, null or a string. */
+function optString(v: unknown): boolean {
+  return v === undefined || v === null || typeof v === "string";
+}
+function optNumber(v: unknown): boolean {
+  return v === undefined || v === null || (typeof v === "number" && Number.isFinite(v));
+}
+function optBoolean(v: unknown): boolean {
+  return v === undefined || v === null || typeof v === "boolean";
+}
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Type check of an events batch before anything touches SQLite (which throws
+ * on objects, ending in a 500). Returns an error message or null. Event ids
+ * out of range are not an error: ingestEvents skips them, as before.
+ */
+export function validateEvents(items: unknown[]): string | null {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!isPlainObject(item)) return `events[${i}] must be an object`;
+    if (typeof item.event_id !== "number" && typeof item.event_id !== "string") return `events[${i}].event_id must be a number`;
+    for (const key of ["status", "response_hex", "raw_packets_json", "fetched_at_utc"] as const) {
+      if (!optString(item[key])) return `events[${i}].${key} must be a string`;
+    }
+  }
+  return null;
+}
+
 export interface IngestResult {
   acked: number[];
   inserted: number;
@@ -197,6 +228,18 @@ export interface IncomingSnapshot {
   frames?: Record<string, string>;
 }
 
+export function validateSnapshot(snap: unknown): string | null {
+  if (!isPlainObject(snap)) return "snapshot must be an object";
+  if (!optString(snap.collected_utc)) return "collected_utc must be a string";
+  for (const key of ["values", "statuses", "frames"] as const) {
+    if (snap[key] !== undefined && snap[key] !== null && !isPlainObject(snap[key])) return `${key} must be an object`;
+  }
+  if (isPlainObject(snap.frames)) {
+    for (const [k, v] of Object.entries(snap.frames)) if (v !== null && typeof v !== "string") return `frames.${k} must be a hex string`;
+  }
+  return null;
+}
+
 export function saveSnapshot(serial: string, snap: IncomingSnapshot): void {
   const db = getDb();
   const frames = (snap.frames ?? {}) as Partial<Record<ClassicKey, string>>;
@@ -235,6 +278,18 @@ export interface IncomingLive {
   charging?: boolean | null;
   sensor_83?: number | null;
   sensor_84?: number | null;
+}
+
+const LIVE_NUMBERS = ["battery", "error_state", "lifetime_sticks", "lifetime_puffs", "lifetime_seconds", "brightness_level", "battery_temp_c", "sensor_83", "sensor_84"] as const;
+const LIVE_STRINGS = ["stick_state", "session_raw", "sync_status", "status_60_raw"] as const;
+const LIVE_BOOLEANS = ["connected", "charging"] as const;
+
+export function validateLive(live: unknown): string | null {
+  if (!isPlainObject(live)) return "live must be an object";
+  for (const key of LIVE_NUMBERS) if (!optNumber(live[key])) return `${key} must be a number`;
+  for (const key of LIVE_STRINGS) if (!optString(live[key])) return `${key} must be a string`;
+  for (const key of LIVE_BOOLEANS) if (!optBoolean(live[key])) return `${key} must be a boolean`;
+  return null;
 }
 
 /** The part of extra_json whose change is worth a live sample. */

@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { getDb, nowUtc, schema } from "@/db";
 import type { Agent } from "@/db/schema";
@@ -14,16 +14,32 @@ export function generateApiKey(): string {
 
 export type AgentIdentity = { id: number | null; name: string };
 
+/** Constant-time string comparison (hashing first hides the length too). */
+function safeEqual(a: string, b: string): boolean {
+  return timingSafeEqual(createHash("sha256").update(a).digest(), createHash("sha256").update(b).digest());
+}
+
 /**
- * Validates X-Api-Key. A fixed AGENT_API_KEY environment variable is accepted
- * too (handy for docker-compose), and when no agents exist yet, any key is
- * accepted and registered on the fly so first contact needs no manual step.
+ * First-contact registration: while the agents table is empty, any key is
+ * accepted and stored. Only without AGENT_API_KEY (that variable already
+ * says which key is valid), and AGENT_AUTO_REGISTER=false turns it off.
+ */
+export function autoRegisterEnabled(): boolean {
+  if (process.env.AGENT_API_KEY?.trim()) return false;
+  const flag = process.env.AGENT_AUTO_REGISTER?.trim().toLowerCase();
+  return !(flag === "false" || flag === "0" || flag === "no" || flag === "off");
+}
+
+/**
+ * Validates X-Api-Key against the fixed AGENT_API_KEY environment variable
+ * (handy for docker-compose) and the keys stored in the agents table. See
+ * autoRegisterEnabled() for the first-contact case.
  */
 export function authenticateAgent(request: Request): AgentIdentity | null {
   const key = request.headers.get("x-api-key")?.trim();
   if (!key) return null;
   const envKey = process.env.AGENT_API_KEY?.trim();
-  if (envKey && key === envKey) return { id: null, name: "env" };
+  if (envKey && safeEqual(key, envKey)) return { id: null, name: "env" };
   const db = getDb();
   const hash = hashApiKey(key);
   const found = db.select().from(schema.agents).where(eq(schema.agents.apiKeyHash, hash)).get();
@@ -31,6 +47,7 @@ export function authenticateAgent(request: Request): AgentIdentity | null {
     db.update(schema.agents).set({ lastSeenUtc: nowUtc() }).where(eq(schema.agents.id, found.id)).run();
     return { id: found.id, name: found.name };
   }
+  if (!autoRegisterEnabled()) return null;
   const anyAgent = db.select({ id: schema.agents.id }).from(schema.agents).limit(1).get();
   if (!anyAgent) {
     const created = db

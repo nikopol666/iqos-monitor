@@ -1,12 +1,13 @@
 import { badRequest, clampInt, json } from "@/lib/api";
 import { avgSessionSeconds, listDevicesLabeled as listDevices, statsFor } from "@/lib/queries";
-import { isDateKey, addDays, todayKey } from "@/lib/time";
+import { addDays, statsRangeError, todayKey } from "@/lib/time";
 import type { GroupBy } from "@/lib/stats";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/stats?from=YYYY-MM-DD&to=YYYY-MM-DD&group=hour|day|week|month&device=S1,S2&user=ID&week_start=1..7
+ * Years 2010–2100; at most 31 days by hour, ~5 years by day/week, ~50 years by month.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -14,8 +15,8 @@ export async function GET(request: Request) {
   const from = url.searchParams.get("from") || addDays(today, -89);
   const to = url.searchParams.get("to") || today;
   const group = (url.searchParams.get("group") || "day") as GroupBy;
-  if (!isDateKey(from) || !isDateKey(to) || from > to) return badRequest("invalid range");
-  if (!["hour", "day", "week", "month"].includes(group)) return badRequest("invalid group");
+  const rangeError = statsRangeError(from, to, group);
+  if (rangeError) return badRequest(rangeError);
   const weekStart = clampInt(url.searchParams.get("week_start"), 1, 7, 1);
   const all = listDevices();
   let serials = all.map((d) => d.serial);
