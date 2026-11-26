@@ -117,7 +117,14 @@ export function parseSnapshotFrames(frames: Partial<Record<ClassicKey, string>>)
       statuses[key] = "missing";
       continue;
     }
-    const { status, payload } = decodeClassic(hexToBytes(hex), hexToBytes(READ_COMMANDS[key]));
+    let frame: Uint8Array;
+    try {
+      frame = hexToBytes(String(hex));
+    } catch {
+      statuses[key] = "invalid"; // not hex: stored as sent, never decoded
+      continue;
+    }
+    const { status, payload } = decodeClassic(frame, hexToBytes(READ_COMMANDS[key]));
     statuses[key] = status;
     if (status === "ok") payloads[key] = payload;
   }

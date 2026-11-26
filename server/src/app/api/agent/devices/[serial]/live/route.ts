@@ -1,6 +1,6 @@
 import { authenticateAgent, unauthorized } from "@/lib/auth";
 import { badRequest, json, readJson, validSerial } from "@/lib/api";
-import { ensureDevice, updateLive, type IncomingLive } from "@/lib/ingest";
+import { ensureDevice, updateLive, validateLive, type IncomingLive } from "@/lib/ingest";
 
 /** One-second live tick while the device is connected (or a disconnect notice). */
 export async function POST(request: Request, ctx: RouteContext<"/api/agent/devices/[serial]/live">) {
@@ -10,6 +10,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/agent/devic
   if (!validSerial(serial)) return badRequest("invalid serial");
   const body = await readJson<IncomingLive>(request);
   if (!body || typeof body !== "object") return badRequest("invalid json");
+  const invalid = validateLive(body);
+  if (invalid) return badRequest(invalid);
   ensureDevice(serial);
   updateLive(serial, identity.id, body);
   return json({ ok: true });

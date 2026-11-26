@@ -1,6 +1,7 @@
 # IQOS Monitor – one container: web UI + API + SQLite.
 # Save as docker-compose.yml, then:  docker compose up -d
-# Optional overrides (environment or .env): IQOS_PORT, TZ, DISPLAY_TZ, AGENT_API_KEY, IQOS_TAG.
+# Optional overrides (environment or .env): IQOS_PORT, TZ, DISPLAY_TZ, AGENT_API_KEY,
+# AGENT_AUTO_REGISTER, TRUSTED_ORIGINS, IQOS_TAG.
 
 services:
   iqos-monitor:
@@ -15,6 +16,11 @@ services:
       DATABASE_PATH: /data/iqos.sqlite3
       # Optional fixed key accepted from every agent (otherwise create keys in Settings → Agents).
       AGENT_API_KEY: ${AGENT_API_KEY:-}
+      # Without AGENT_API_KEY, the first agent's key is accepted and stored while no
+      # agent exists yet; "false" turns that off (create keys in Settings → Agents).
+      AGENT_AUTO_REGISTER: ${AGENT_AUTO_REGISTER:-}
+      # Extra browser origins allowed to change data, e.g. https://iqos.example.com
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-}
     volumes:
       - iqos-data:/data
 

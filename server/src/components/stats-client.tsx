@@ -7,7 +7,7 @@ import { Bar, CartesianGrid, ComposedChart, LabelList, Line, ReferenceLine, Resp
 import { useFormat, useI18n } from "@/lib/i18n/client";
 import type { StatsResult, GroupBy, Bucket, StatTotals } from "@/lib/stats";
 import type { DayRecord } from "@/lib/queries";
-import { addDays, isoWeekKey, monthEnd, weekStartOf } from "@/lib/time";
+import { addDays, daysBetweenInclusive, isoWeekKey, monthEnd, STATS_MAX_DAYS, weekStartOf } from "@/lib/time";
 import { Card, CardTitle, Notice } from "@/components/ui";
 import { colorCss } from "@/lib/palette";
 
@@ -67,6 +67,11 @@ function autoGroup(days: number | null): GroupBy {
   return days === null || days >= 365 ? "month" : days >= 90 ? "week" : "day";
 }
 
+/** The server caps the range per grouping; a too long range falls back to months. */
+function fitGroup(view: RangeView): RangeView {
+  return daysBetweenInclusive(view.from, view.to) > STATS_MAX_DAYS[view.group] ? { ...view, group: "month" } : view;
+}
+
 /** Calendar period for the pager modes. */
 function periodBounds(mode: Exclude<Mode, "range">, anchor: string, weekStart: number): RangeView {
   if (mode === "day") return { from: anchor, to: anchor, group: "hour" };
@@ -112,7 +117,7 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
   // Default 90-day range reads better by week; day grouping stays one click away.
   const [range, setRange] = useState<RangeView>({ from: defaultFrom, to: defaultTo, group: "week" });
   const [history, setHistory] = useState<RangeView[]>([]);
-  const view: RangeView = mode === "range" ? range : periodBounds(mode, anchor, weekStart);
+  const view: RangeView = mode === "range" ? fitGroup(range) : periodBounds(mode, anchor, weekStart);
   const { from, to, group } = view;
   const [userId, setUserId] = useState<string>("");
   const [serial, setSerial] = useState<string>("");
@@ -342,13 +347,13 @@ export function StatsClient({ devices, users, defaultFrom, defaultTo }: { device
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-xs text-text-2">
             <label className="inline-flex items-center gap-2">
               {t.common.from}
-              <input type="date" className="ui-input h-8" value={range.from} max={range.to} onChange={(e) => patchRange({ from: e.target.value })} />
+              <input type="date" className="ui-input h-8" value={range.from} min="2010-01-01" max={range.to} onChange={(e) => patchRange({ from: e.target.value })} />
             </label>
             <label className="inline-flex items-center gap-2">
               {t.common.to}
-              <input type="date" className="ui-input h-8" value={range.to} min={range.from} onChange={(e) => patchRange({ to: e.target.value })} />
+              <input type="date" className="ui-input h-8" value={range.to} min={range.from} max="2100-12-31" onChange={(e) => patchRange({ to: e.target.value })} />
             </label>
-            <Segmented label={t.stats.groupBy} value={range.group} options={groupOptions} onChange={(g) => patchRange({ group: g })} />
+            <Segmented label={t.stats.groupBy} value={group} options={groupOptions} onChange={(g) => patchRange({ group: g })} />
           </div>
         ) : null}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-xs text-text-2">

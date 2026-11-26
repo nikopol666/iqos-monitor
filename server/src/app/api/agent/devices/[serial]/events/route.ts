@@ -1,6 +1,6 @@
 import { authenticateAgent, unauthorized } from "@/lib/auth";
 import { badRequest, json, readJson, validSerial } from "@/lib/api";
-import { ensureDevice, ingestEvents, setAckedNextIndex, type IncomingEvent } from "@/lib/ingest";
+import { ensureDevice, ingestEvents, setAckedNextIndex, validateEvents, type IncomingEvent } from "@/lib/ingest";
 
 interface EventsBody {
   events?: IncomingEvent[];
@@ -18,6 +18,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/agent/devic
   const body = await readJson<EventsBody>(request);
   if (!body || !Array.isArray(body.events)) return badRequest("events[] required");
   if (body.events.length > 500) return badRequest("max 500 events per batch");
+  const invalid = validateEvents(body.events);
+  if (invalid) return badRequest(invalid);
   ensureDevice(serial);
   const result = ingestEvents(serial, body.events);
   if (body.range_complete && typeof body.next_index === "number" && body.next_index > 0) {

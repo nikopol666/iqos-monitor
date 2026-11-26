@@ -1,6 +1,6 @@
 import { authenticateAgent, unauthorized } from "@/lib/auth";
 import { badRequest, json, readJson, validSerial } from "@/lib/api";
-import { ensureDevice, saveSnapshot, type IncomingSnapshot } from "@/lib/ingest";
+import { ensureDevice, saveSnapshot, validateSnapshot, type IncomingSnapshot } from "@/lib/ingest";
 
 export async function POST(request: Request, ctx: RouteContext<"/api/agent/devices/[serial]/snapshot">) {
   const identity = authenticateAgent(request);
@@ -9,6 +9,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/agent/devic
   if (!validSerial(serial)) return badRequest("invalid serial");
   const body = await readJson<IncomingSnapshot>(request);
   if (!body || typeof body !== "object") return badRequest("invalid json");
+  const invalid = validateSnapshot(body);
+  if (invalid) return badRequest(invalid);
   ensureDevice(serial);
   saveSnapshot(serial, body);
   return json({ ok: true });

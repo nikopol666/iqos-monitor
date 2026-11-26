@@ -92,8 +92,35 @@ export function daysBetweenInclusive(from: string, to: string): number {
   return Math.round((utcMidnight(to) - utcMidnight(from)) / 86400000) + 1;
 }
 
+/** True for a real calendar date in YYYY-MM-DD form (2026-02-31 is rejected). */
 export function isDateKey(s: unknown): s is string {
-  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + "T00:00:00Z"));
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split("-").map(Number);
+  const date = new Date(0);
+  date.setUTCFullYear(y, m - 1, d); // unlike Date.UTC, keeps years 0–99 as written
+  // 02-31 rolls over into March; a round trip catches that.
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
+/** Bounds of /api/stats requests; a wider range would build millions of buckets. */
+export const STATS_MIN_YEAR = 2010;
+export const STATS_MAX_YEAR = 2100;
+export const STATS_MAX_DAYS: Record<"hour" | "day" | "week" | "month", number> = {
+  hour: 31,
+  day: 5 * 366,
+  week: 5 * 366,
+  month: 50 * 366,
+};
+
+/** Why a stats range is refused, or null when it is fine. */
+export function statsRangeError(from: unknown, to: unknown, group: unknown): string | null {
+  if (!isDateKey(from) || !isDateKey(to) || from > to) return "invalid range";
+  if (group !== "hour" && group !== "day" && group !== "week" && group !== "month") return "invalid group";
+  const fromYear = Number(from.slice(0, 4));
+  const toYear = Number(to.slice(0, 4));
+  if (fromYear < STATS_MIN_YEAR || toYear > STATS_MAX_YEAR) return "range out of bounds";
+  if (daysBetweenInclusive(from, to) > STATS_MAX_DAYS[group]) return "range too large for group";
+  return null;
 }
 
 /**

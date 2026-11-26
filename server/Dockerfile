@@ -11,7 +11,8 @@ FROM node:22-bookworm-slim AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# test-vectors live one level up in the monorepo; the build context is the repo root.
+# The build context is server/ (see docker-compose.build.yml and the CI workflow);
+# nothing outside it is needed, the test vectors are only used by the tests.
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

@@ -104,12 +104,30 @@ Environment variables (see `docker-compose.yml`):
 |---|---|---|
 | `TZ`, `DISPLAY_TZ` | `Europe/Prague` | time zone for days and weeks |
 | `AGENT_API_KEY` | unset | a fixed key every agent may use; otherwise create keys in *Settings → Agents* |
+| `AGENT_AUTO_REGISTER` | `true` | `false` turns off first-contact registration (see below) |
+| `TRUSTED_ORIGINS` | unset | extra origins allowed to change data from the browser, e.g. `https://iqos.example.com` (see below) |
 | `IQOS_PORT` | `3000` | published port |
 | `IQOS_TAG` | `latest` | image tag |
 
 Behind a reverse proxy with single sign-on, leave `/api/agent/` reachable
 without the SSO layer: that is the only path the agent uses, and it
 authenticates with its API key. Everything else can sit behind the login.
+
+**Agent keys and an empty agent list.** Without `AGENT_API_KEY`, while
+*Settings → Agents* lists no agent, the server accepts **any** API key and
+stores it as the first agent, so the first agent connects without a manual
+step. Until that happens (and again after deleting every agent) anybody who
+reaches `/api/agent/` can register. Create a key in *Settings → Agents*
+before exposing the server, or set `AGENT_AUTO_REGISTER=false`. With
+`AGENT_API_KEY` set, nothing registers on its own: only that key and the
+keys from *Settings → Agents* are accepted.
+
+**Browser writes.** The web API accepts changes (POST, PUT, PATCH, DELETE
+outside `/api/agent/`) only as JSON and, when the browser sends an `Origin`,
+only from the server's own address (`Host` or `X-Forwarded-Host`). If a
+reverse proxy rewrites `Host` without setting `X-Forwarded-Host`, saving
+settings fails with 403; forward the original host or list the public
+address in `TRUSTED_ORIGINS` (comma-separated).
 
 To build the image on the host instead of pulling it:
 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.

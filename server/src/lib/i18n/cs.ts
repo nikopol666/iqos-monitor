@@ -311,5 +311,5 @@ export const cs: Dictionary = {
     puffsPerStick: "Potáhnutí na náplň",
   },
   units: { percent: "%", hours: "h" },
-  status: { ok: "ok", empty: "prázdné", timeout: "timeout", bad_crc: "chyba CRC", device_error: "chyba zařízení" },
+  status: { ok: "ok", empty: "prázdné", timeout: "timeout", bad_frame: "neplatný rámec", bad_crc: "chyba CRC", device_error: "chyba zařízení" },
 };
